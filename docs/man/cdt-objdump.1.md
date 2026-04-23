@@ -2,7 +2,7 @@
 date: April 18, 2023
 section: 1
 title: 'CDT-OBJDUMP'
-footer: AntelopeIO
+footer: PureEOSIO
 header: Contract Development Toolkit (CDT)
 ---
 
@@ -255,8 +255,8 @@ Pass \@FILE as argument to read options from FILE.
 
 # BUGS
 
-Please submit bug reports online at https://github.com/AntelopeIO/cdt/issues
+Please submit bug reports online at https://github.com/PureEOSIO/cdt/issues
 
 # SEE ALSO
 
-For more details consult the full documentation and sources https://github.com/AntelopeIO/cdt
+For more details consult the full documentation and sources https://github.com/PureEOSIO/cdt

@@ -3,8 +3,8 @@ content_title: Crypto Extensions API
 ---
 
 
-Antelope blockchain implements cryptographic functions for operations on points on elliptic curves, computing hashes 
-of big integers, big integer modular exponentiation, and other operations useful for implementing 
+EOS blockchain implements cryptographic functions for operations on points on elliptic curves, computing hashes
+of big integers, big integer modular exponentiation, and other operations useful for implementing
 cryptographic algorithms in your contracts.
 
 In order to use the Crypto Extensions API you need to activate a protocol feature `CRYPTO_PRIMITIVES`
@@ -12,7 +12,7 @@ in `nodeos`. To do this you should call the following command in your command li
 
 `"cleos push action eosio activate ["6bcb40a24e49c26d0a60513b6aeb8551d264e4717f306b81a37a5afb3b47cedc"] -p eosio@active"`
 
-And you need to include in the source code of your contract the following header: [crypto_ext.hpp](https://github.com/AntelopeIO/cdt/blob/main/libraries/eosiolib/core/eosio/crypto_ext.hpp)
+And you need to include in the source code of your contract the following header: [crypto_ext.hpp](https://github.com/PureEOSIO/cdt/blob/main/libraries/eosiolib/core/eosio/crypto_ext.hpp)
 
 The header declares following basic plain C functions which implement the core functionality:
 
@@ -44,7 +44,7 @@ Also, the header contains a set of handy C++ wrappers to simplify the contracts 
 
 ## C++ API
 
-`ec_point` type was added to represent `G1` and `G2` points on the elliptic curve. 
+`ec_point` type was added to represent `G1` and `G2` points on the elliptic curve.
 `ec_point_view` type was added to provide a read-only interface for access to `G1` and `G2` points data.
 
 ### Data Types
@@ -55,22 +55,22 @@ Also, the header contains a set of handy C++ wrappers to simplify the contracts 
    struct ec_point {
       std::vector<char> x; // x coordinate
       std::vector<char> y; // y coordinate
-      // Construct from two coordinates represented by big integers 
+      // Construct from two coordinates represented by big integers
       ec_point(std::vector<char>& x_, std::vector<char>& y_);
       // Construct from a serialized point
       ec_point(std::vector<char>& p);
       // Return a serialized point containing only x and y
       std::vector<char> serialized() const;
    };
- 
-   // Abstracts read-only G1 and G2 points    
+
+   // Abstracts read-only G1 and G2 points
    template <std::size_t Size = 32>
    struct ec_point_view {
       const char* x;
       const char* y;
-      // Number of bytes in each of x and y       
+      // Number of bytes in each of x and y
       uint32_t size;
-      // Construct from two coordinates. Their sizes must be equal      
+      // Construct from two coordinates. Their sizes must be equal
       ec_point_view(const char* x_, uint32_t x_size, const char* y_, uint32_t y_size);
       // Construct from a serialized point
       ec_point_view(const std::vector<char>& p);
@@ -79,9 +79,9 @@ Also, the header contains a set of handy C++ wrappers to simplify the contracts 
       // Return serialized point containing only x and y
       std::vector<char> serialized() const;
    };
-    
+
    // Big integer.
-   using bigint = std::vector<char>;   
+   using bigint = std::vector<char>;
 ```
 
 ### Methods
@@ -109,8 +109,8 @@ Also, the header contains a set of handy C++ wrappers to simplify the contracts 
    int32_t mod_exp( const bigint& base, const bigint& exp, const bigint& mod, bigint& result )
 ```
 
-Please take a look into a [crypto_ext.hpp](https://github.com/AntelopeIO/cdt/blob/main/libraries/eosiolib/core/eosio/crypto_ext.hpp)
-header file, it contains more wrappers and helper functions which may be useful in your code. 
+Please take a look into a [crypto_ext.hpp](https://github.com/PureEOSIO/cdt/blob/main/libraries/eosiolib/core/eosio/crypto_ext.hpp)
+header file, it contains more wrappers and helper functions which may be useful in your code.
 
 ### Examples
 
@@ -118,13 +118,13 @@ header file, it contains more wrappers and helper functions which may be useful 
 ```c++
    std::vector<char> x1, y1, x2, y2; // Declare coordinates for points on an elliptic curve
 
-   // Create the points on the curve 
+   // Create the points on the curve
    eosio::g1_point point1 {x1, y1};
    eosio::g1_point point2 {x2, y2};
    // Add two points and get a third point on the curve as result
    auto result = eosio::alt_bn128_add(point1, point2);
 
-   // Do the same addition but with g1_point_view data types 
+   // Do the same addition but with g1_point_view data types
    eosio::g1_point_view point_view1 {x1.data(), x1.size(), y1.data(), y1.size()};
    eosio::g1_point_view point_view2 {x2.data(), x2.size(), y2.data(), y2.size()};
    result = eosio::alt_bn128_add(point_view1, point_view2);
@@ -132,7 +132,7 @@ header file, it contains more wrappers and helper functions which may be useful 
 
 - `alt_bn128_mul`
 ```c++
-   // Declare coordinates for a point on an elliptic curve and a big integer 
+   // Declare coordinates for a point on an elliptic curve and a big integer
    std::vector<char> x, y, scalar;
    eosio::bigint s {scalar};
 
@@ -148,7 +148,7 @@ header file, it contains more wrappers and helper functions which may be useful 
 
 - `alt_bn128_pair`
 ```c++
-   // Declare coordinates for the pairs of points on an elliptic curve 
+   // Declare coordinates for the pairs of points on an elliptic curve
    std::vector<char> g1_a_x, g1_a_y, g2_a_x, g2_a_y, g1_b_x, g1_b_y, g2_b_x, g2_b_y;
 
 
@@ -159,14 +159,14 @@ header file, it contains more wrappers and helper functions which may be useful 
    // Second pair
    eosio::g1_point g1_b {g1_b_x, g1_b_y};
    eosio::g2_point g2_b {g2_b_x, g2_b_y};
-   
+
    // Create the pairs object
    std::vector<std::pair<eosio::g1_point, eosio::g2_point>> pairs { {g1_a, g2_a}, {g1_b, g2_b} };
-   
+
    // Perform the pairing check
    // Return:
-   // -1 if there is an error 
-   // 1 if the points not in a target group 
+   // -1 if there is an error
+   // 1 if the points not in a target group
    // 0 if the points in a target group
    auto result = eosio::alt_bn128_pair(pairs);
 

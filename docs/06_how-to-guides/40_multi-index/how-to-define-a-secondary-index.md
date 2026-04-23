@@ -16,7 +16,7 @@ See the following code reference:
 
 Make sure you have the following prerequisites in place:
 
-* An Antelope development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
+* An EOS development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
 * A multi-index table `testtab` along with its `test_table` data structure, its mandatory primary index, and the type alias definition `test_table_t`. Please see [How To Define A Primary Index](./how-to-define-a-primary-index) to set up these prerequisites.
 
 ## Procedure
@@ -116,7 +116,7 @@ __multi_index_example.hpp__
 Now you have instantiated the `testtab` as a multi-index table which has a primary index defined for its `test_primary` data member and a secondary index for its `secondary` data member.
 
 [[info | Full example location]]
-| A full example project demonstrating the instantiation and usage of multi-index table can be found [here](https://github.com/AntelopeIO/cdt/blob/main/examples/multi_index_example).
+| A full example project demonstrating the instantiation and usage of multi-index table can be found [here](https://github.com/PureEOSIO/cdt/blob/main/examples/multi_index_example).
 
 [[warning | Do not add a secondary index to an existing table]]
 | Adding a secondary index to an existing multi-index table it will have unpredictable outcome. Consult the [Data design and migration](../best-practices/data-design-and-migration) documentation for more details.

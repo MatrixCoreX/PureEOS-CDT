@@ -16,7 +16,7 @@ See the following code reference:
 
 Make sure you have the following prerequisites in place:
 
-* An Antelope development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
+* An EOS development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
 
 ## Procedure
 
@@ -45,7 +45,7 @@ Define the data structure for the multi-index table:
 
 ### 3. Define A Singleton Type Alias
 
-For ease of use, define a type alias `singleton_type` based on the `eosio::singleton` template type, parametarized with a random name `"testtable"` and the `testtable` data structure. The names must adhere to `Antelope` account name restrictions.
+For ease of use, define a type alias `singleton_type` based on the `eosio::singleton` template type, parametarized with a random name `"testtable"` and the `testtable` data structure. The names must adhere to `EOS` account name restrictions.
 
    ```diff
    struct [[eosio::table]] testtable {
@@ -146,7 +146,7 @@ __singleton_example.cpp__
 ```
 
 [[info | Full example location]]
-| A full example project demonstrating the instantiation and usage of singleton can be found [here](https://github.com/AntelopeIO/cdt/blob/main/examples/multi_index_example).
+| A full example project demonstrating the instantiation and usage of singleton can be found [here](https://github.com/PureEOSIO/cdt/blob/main/examples/multi_index_example).
 
 ## Summary
 

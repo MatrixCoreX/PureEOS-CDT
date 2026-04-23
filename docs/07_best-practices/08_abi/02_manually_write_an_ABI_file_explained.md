@@ -12,4 +12,4 @@ link_text: Manually write/edit an ABI file
  - For each Ricardian contract the header `<h1 class="contract">ActionName</h1>` should be used, as this directs the ABI generator to attach this Ricardian contract to the specified action.
  - For each Ricardian clause, the header `<h1 class="clause">ClauseID</h1>` should be used, as this directs the ABI generator to the clause id and the subsequent body.
  - The option `-R` has been added to [`cdt-cpp`](../../03_command-reference/cdt-cpp.md) to add "resource" paths to search from, so you can place these files in any directory structure you like and use `-R<path to file>` in the same vein as `-I` for include paths.
- - For exemplification see [hello.contracts.md](https://github.com/AntelopeIO/cdt/blob/main/examples/hello/ricardian/hello.contracts.md).
+ - For exemplification see [hello.contracts.md](https://github.com/PureEOSIO/cdt/blob/main/examples/hello/ricardian/hello.contracts.md).

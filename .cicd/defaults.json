@@ -1,5 +1,5 @@
 {
-    "antelope-spring-dev":{
+    "pureeos-helios-dev":{
        "target":"release/2.0",
        "prerelease":false
     }

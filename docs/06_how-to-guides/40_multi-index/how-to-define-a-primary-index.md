@@ -16,7 +16,7 @@ See the following code reference:
 
 Make sure you have the following prerequisites in place:
 
-* An Antelope development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
+* An EOS development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
 
 ## Procedure
 
@@ -78,7 +78,7 @@ Add the definition of the primary index for the multi-index table. The primary i
 
 ### 4. Define A Multi-Index Type Alias
 
-For ease of use, define a type alias `test_table_t` based on the `eosio::multi_index` template type, parametarized with a random name `"testtaba"` and the `test_table` data structure. The names must adhere to `Antelope` account name restrictions.
+For ease of use, define a type alias `test_table_t` based on the `eosio::multi_index` template type, parametarized with a random name `"testtaba"` and the `test_table` data structure. The names must adhere to `EOS` account name restrictions.
 
   ```diff
     // the data structure which defines each row of the table
@@ -116,7 +116,7 @@ Declare the `testtab` multi-index table as a data member of type `test_table_t`.
 Now you have instantiated a multi-index table, and assigned to `testtab` variable, which has a primary index defined for its `test_primary` data member.
 
 [[info | Full example location]]
-| A full example project demonstrating the instantiation and usage of multi-index table can be found [here](https://github.com/AntelopeIO/cdt/blob/main/examples/multi_index_example).
+| A full example project demonstrating the instantiation and usage of multi-index table can be found [here](https://github.com/PureEOSIO/cdt/blob/main/examples/multi_index_example).
 
 ## Summary
 

@@ -6,7 +6,7 @@ on:
 
 jobs:
   label_new_issue:
-    uses: AntelopeIO/issue-project-labeler-workflow/.github/workflows/issue-project-labeler.yaml@v1
+    uses: PureEOSIO/issue-project-labeler-workflow/.github/workflows/issue-project-labeler.yaml@v1
     with:
       issue-id: ${{github.event.issue.node_id}}
       label: triage

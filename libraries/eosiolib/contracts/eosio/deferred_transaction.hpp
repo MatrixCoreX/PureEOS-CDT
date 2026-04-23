@@ -25,8 +25,8 @@ namespace eosio {
    *  @ingroup contracts
    *  @brief Type-safe C++ wrappers for transaction C API
    *
-   *  deferred_transaction is no longer supported on Vaulta. This class is provided to
-   *  support legacy test contracts that use deferred transactions.
+   *  deferred_transaction is provided to support legacy EOS-style test contracts that
+   *  use deferred transactions.
    *
    *  @details An inline message allows one contract to send another contract a message
    *  which is processed immediately after the current message's processing

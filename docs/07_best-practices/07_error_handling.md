@@ -2,7 +2,7 @@
 content_title: Error handling
 ---
 
-Contracts can use `uint64_t` error codes as an alternative (and shorter) means of signaling error conditions, as opposed to string error messages. However, Antelope and CDT reserve certain ranges of the `uint64_t` value space for their own purposes. Contract developers must be aware of the following ranges and restrictions:
+Contracts can use `uint64_t` error codes as an alternative (and shorter) means of signaling error conditions, as opposed to string error messages. However, EOS and CDT reserve certain ranges of the `uint64_t` value space for their own purposes. Contract developers must be aware of the following ranges and restrictions:
 
 1. $0 - 4,999,999,999,999,999,999$:  
 Available for contract developers to assign error codes specific to their contracts.
@@ -14,6 +14,6 @@ Reserved for the CDT compiler to allocate as appropriate. Although the WASM code
 Reserved for the CDT compiler to allocate as appropriate. The error codes in this range are not specific to any contract but rather are used to convey general runtime error conditions associated with the generated code by CDT.
 
 4. $10,000,000,000,000,000,000 - 18,446,744,073,709,551,615$:  
-Reserved by the Antelope protocol to represent protocol-level error conditions. Antelope will actually enforce this by restricting the ability for `eosio_assert_code` to be used to fail with error code values used within this range.
+Reserved by the EOS protocol to represent protocol-level error conditions. EOS will actually enforce this by restricting the ability for `eosio_assert_code` to be used to fail with error code values used within this range.
 
 Therefore, contract developers should only reserve error codes from the first range above to use in their contracts.

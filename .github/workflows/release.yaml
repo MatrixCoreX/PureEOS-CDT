@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Get cdt.deb
         id: getter
-        uses: AntelopeIO/asset-artifact-download-action@v3
+        uses: PureEOSIO/asset-artifact-download-action@v3
         with:
           owner: ${{github.repository_owner}}
           repo: ${{github.event.repository.name}}

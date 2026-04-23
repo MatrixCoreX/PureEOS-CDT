@@ -77,11 +77,11 @@ configure_file(${CMAKE_SOURCE_DIR}/scripts/ricardeos/ricardeos.py ${CMAKE_BINARY
 install(FILES ${CMAKE_BINARY_DIR}/scripts/ricardeos.py DESTINATION ${CDT_INSTALL_PREFIX}/scripts)
 
 # section for package construction
-set(VENDOR "EOSNetworkFoundation")
+set(VENDOR "PureEOSIO")
 set(PROJECT_NAME "cdt")
-set(DESC "Toolchain and supporting tools to facilitate C/C++ development of contracts for Antelope blockchains")
-set(URL "https://github.com/AntelopeIO/cdt")
-set(EMAIL "support@eosnetwork.com")
+set(DESC "Toolchain and supporting tools to facilitate C/C++ development of contracts for EOS blockchains")
+set(URL "https://github.com/PureEOSIO/cdt")
+set(EMAIL "support@pureeos.io")
 configure_file(${CMAKE_SOURCE_DIR}/scripts/generate_package.sh.in ${CMAKE_BINARY_DIR}/packages/generate_package.sh @ONLY)
 configure_file(${CMAKE_SOURCE_DIR}/scripts/generate_deb.sh ${CMAKE_BINARY_DIR}/packages/generate_deb.sh COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/scripts/generate_bottle.sh ${CMAKE_BINARY_DIR}/packages/generate_bottle.sh COPYONLY)
@@ -96,8 +96,10 @@ configure_file(${CMAKE_SOURCE_DIR}/tools/external/wabt/LICENSE ${CMAKE_BINARY_DI
 configure_file(${CMAKE_SOURCE_DIR}/tools/jsoncons/LICENSE ${CMAKE_BINARY_DIR}/licenses/jsoncons.license COPYONLY)
 configure_file(${CMAKE_SOURCE_DIR}/LICENSE ${CMAKE_BINARY_DIR}/licenses/cdt.license COPYONLY)
 
-include(modules/TestsExternalProject.txt)
+if(ENABLE_TESTS)
+   include(modules/TestsExternalProject.txt)
 
-include(CTest)
-enable_testing()
-add_subdirectory(tests)
+   include(CTest)
+   enable_testing()
+   add_subdirectory(tests)
+endif()

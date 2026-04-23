@@ -1,21 +1,21 @@
 # CDT (Contract Development Toolkit)
 
-Contract Development Toolkit (CDT) is a C/C++ toolchain targeting WebAssembly (WASM) and a set of tools to facilitate development of smart contracts written in C/C++ that are meant to be deployed to an [Antelope](https://github.com/AntelopeIO/) blockchain.
+Contract Development Toolkit (CDT) is a C/C++ toolchain targeting WebAssembly (WASM) and a set of tools to facilitate development of smart contracts written in C/C++ that are meant to be deployed to an [EOS](https://github.com/PureEOSIO/) blockchain.
 
-In addition to being a general purpose WebAssembly toolchain, specific features and optimizations are available to support building Antelope-based smart contracts. This new toolchain is built around [Clang 9](https://github.com/AntelopeIO/cdt-llvm), which means that CDT inherits the optimizations and analyses from that version of LLVM, but as the WASM target is still considered experimental, some optimizations are incomplete or not available.
+In addition to being a general purpose WebAssembly toolchain, specific features and optimizations are available to support building EOS-based smart contracts. This new toolchain is built around [Clang 9](https://github.com/PureEOSIO/cdt-llvm), which means that CDT inherits the optimizations and analyses from that version of LLVM, but as the WASM target is still considered experimental, some optimizations are incomplete or not available.
 
 ## Repo organization
 
-The `main` branch is the development branch: do not use this for production. Refer to the [release page](https://github.com/AntelopeIO/cdt/releases) for current information on releases, pre-releases, and obsolete releases as well as the corresponding tags for those releases.
+The `main` branch is the development branch: do not use this for production. Refer to the [release page](https://github.com/PureEOSIO/cdt/releases) for current information on releases, pre-releases, and obsolete releases as well as the corresponding tags for those releases.
 ## Binary packages
 
-CDT currently supports Linux x86_64 Debian packages. Visit the [release page](https://github.com/AntelopeIO/cdt/releases) to download the package for the appropriate version of CDT. This is the fastest way to get started with the software.
+CDT currently supports Linux x86_64 Debian packages. Visit the [release page](https://github.com/PureEOSIO/cdt/releases) to download the package for the appropriate version of CDT. This is the fastest way to get started with the software.
 ### Debian package install
 
 Download the appropriate version of the Debian package and then install it. To download and install the latest version, run the following:
 
 ```sh
-wget https://github.com/AntelopeIO/cdt/releases/download/v4.1.0/cdt_4.1.0_amd64.deb
+wget https://github.com/PureEOSIO/cdt/releases/download/v4.1.0/cdt_4.1.0_amd64.deb
 sudo apt install ./cdt_4.1.0_amd64.deb
 ```
 ### Debian package uninstall
@@ -54,19 +54,19 @@ python3 -m pip install pygments
 
 ### Allowing integration tests to build
 
-Integration tests require access to a build of [Spring](https://github.com/AntelopeIO/spring), a C++ implementation of the Antelope protocol. Simply installing Spring from a binary package will not be sufficient.
+Integration tests require access to a build of [Helios](https://github.com/PureEOSIO/helios), a C++ implementation of the EOS protocol. Simply installing Helios from a binary package will not be sufficient.
 
-If you do not wish to build Spring, you can continue with building CDT but without building the integration tests. Otherwise, follow the instructions below before running `cmake`.
+If you do not wish to build Helios, you can continue with building CDT but without building the integration tests. Otherwise, follow the instructions below before running `cmake`.
 
-First, ensure that Spring has been built from source (see Spring's [README](https://github.com/AntelopeIO/spring#building-from-source) for details) and identify the build path, e.g. `/path/to/spring/build/`.
+First, ensure that Helios has been built from source (see Helios's [README](https://github.com/PureEOSIO/helios#building-from-source) for details) and identify the build path, e.g. `/path/to/helios/build/`.
 
 Then, execute the following command in the same terminal session that you will use to build CDT:
 
 ```sh
-export spring_DIR=/path/to/spring/build/lib/cmake/spring
+export helios_DIR=/path/to/helios/build/lib/cmake/helios
 ```
 
-Now you can continue with the steps to build CDT as described. When you run `cmake` make sure that it does not report `spring package not found`. If it does, this means CDT was not able to find a build of Spring at the specified path in `spring_DIR` and will therefore continue without building the integration tests.
+Now you can continue with the steps to build CDT as described. When you run `cmake` make sure that it does not report `helios package not found`. If it does, this means CDT was not able to find a build of Helios at the specified path in `helios_DIR` and will therefore continue without building the integration tests.
 
 ### ccache
 
@@ -81,7 +81,7 @@ export CCACHE_DISABLE=1
 **A Warning On Parallel Compilation Jobs (`-j` flag)**: When building C/C++ software often the build is performed in parallel via a command such as `make -j $(nproc)` which uses the number of CPU cores as the number of compilation jobs to perform simultaneously. However, be aware that some compilation units (.cpp files) in CDT are extremely complex and can consume a large amount of memory to compile. If you are running into issues due to amount of memory available on your build host, you may need to reduce the level of parallelization used for the build. For example, instead of `make -j $(nproc)` you can try `make -j2`. Failures due to memory exhaustion will typically but not always manifest as compiler crashes.
 
 ```sh
-git clone --recursive https://github.com/AntelopeIO/cdt
+git clone --recursive https://github.com/PureEOSIO/cdt
 cd cdt
 mkdir build
 cd build

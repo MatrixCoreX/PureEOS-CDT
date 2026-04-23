@@ -12,7 +12,7 @@ In order to accomplish this, use the `return` statement and pass the desired ret
 
 Make sure you have the following prerequisites in place:
 
-* An Antelope development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
+* An EOS development environment, for details consult the [Documentation Portal](https://docs.eosnetwork.com/docs/latest/).
 * A smart contract, let’s call it `smrtcontract`, which builds without error.
 * An action, let’s call it `checkwithrv`, from which you want to return a value of a user defined type `action_response`.
 
@@ -64,11 +64,11 @@ action_response smrtcontract::checkwithrv( name nm ) {
 }
 ```
 
-For a complete example of a smart contract that implements an action which returns a value see the [hello example contract](https://github.com/AntelopeIO/cdt/blob/main/examples/hello).
+For a complete example of a smart contract that implements an action which returns a value see the [hello example contract](https://github.com/PureEOSIO/cdt/blob/main/examples/hello).
 
 ## Next Steps
 
-* Compile the smart contract and deploy it to the Antelope testnet or any Antelope based blockchain.
+* Compile the smart contract and deploy it to the EOS testnet or any EOS based blockchain.
 * Use the `cleos` command to send the `checkwithrv` action to the smart contract and observe the returned value in the `cleos` output.
 * Use other means (e.g. programmatically) to send the  `checkwithrv` action to the smart contract and observe the returned value in the action trace.
 

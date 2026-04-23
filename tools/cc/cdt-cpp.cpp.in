@@ -67,7 +67,7 @@ void generate(const std::vector<std::string>& base_options, std::string input, s
 
    // We used to accept a command line option `--abi-version` which allowed a user to force an abi version
    // to be generated.
-   // Since https://github.com/AntelopeIO/cdt/pull/360, this command line flag is ignored, and the abi
+   // Since https://github.com/PureEOSIO/cdt/pull/360, this command line flag is ignored, and the abi
    // version is generated according to the features used in the contract being compiled, starting from a
    // base `1.2` version and up.
    // ----------------------------------------------------------------------------------------------------
@@ -153,7 +153,7 @@ int main(int argc, const char **argv) {
                output = opts.output_fn.empty() ? "a.out" : opts.output_fn;
             } else {
                SmallString<64> res;
-               llvm::sys::fs::createTemporaryFile("antelope", ".o", res);
+               llvm::sys::fs::createTemporaryFile("pureeos", ".o", res);
                output = res.c_str();
             }
 

@@ -2,7 +2,7 @@
 title: CDT-ABIDIFF
 section: 1
 header: Contract Development Toolkit (CDT)
-footer: AntelopeIO
+footer: PureEOSIO
 date: April 18 2023
 ---
 # NAME
@@ -19,8 +19,8 @@ cdt-abidiff - A tool for comparison of two CDT ABI files.
 
 # BUGS
 
-Please submit bug reports online at https://github.com/AntelopeIO/cdt/issues
+Please submit bug reports online at https://github.com/PureEOSIO/cdt/issues
 
 # SEE ALSO
 
-For more details consult the full documentation and sources https://github.com/AntelopeIO/cdt
+For more details consult the full documentation and sources https://github.com/PureEOSIO/cdt
