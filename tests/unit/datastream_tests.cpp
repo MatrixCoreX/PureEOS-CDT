@@ -72,7 +72,8 @@ EOSIO_TEST_BEGIN(datastream_test)
    // inline void skip(size_t)
    ds.skip(1);
    CHECK_EQUAL( ds.pos(), datastream_buffer+1 )
-   ds.skip(-1);
+   CHECK_ASSERT( "datastream attempted to skip past the end", ([&]() {ds.skip(size_t(-1));}) )
+   CHECK_EQUAL( ds.seekp(0), true )
    CHECK_EQUAL( ds.pos(), datastream_buffer )
 
    // inline bool read(char*, size_t)
@@ -123,8 +124,8 @@ EOSIO_TEST_BEGIN(datastream_test)
    ds.seekp(256);
    CHECK_EQUAL( ds.valid(), true )
 
-   ds.seekp(257);
-   CHECK_EQUAL( ds.valid(), false )
+   CHECK_EQUAL( ds.seekp(257), false )
+   CHECK_EQUAL( ds.valid(), true )
 
    // inline size_t tellp()const
    ds.seekp(0);
@@ -132,7 +133,7 @@ EOSIO_TEST_BEGIN(datastream_test)
    ds.seekp(256);
    CHECK_EQUAL( ds.tellp(), 256 )
    ds.seekp(257);
-   CHECK_EQUAL( ds.tellp(), 257 )
+   CHECK_EQUAL( ds.tellp(), 256 )
 
    //inline size_t remaining()const
    ds.seekp(0);
@@ -140,7 +141,7 @@ EOSIO_TEST_BEGIN(datastream_test)
    ds.seekp(256);
    CHECK_EQUAL( ds.remaining(), 0 )
    ds.seekp(257);
-   CHECK_EQUAL( ds.remaining(), -1)
+   CHECK_EQUAL( ds.remaining(), 0)
 EOSIO_TEST_END
 
 // Definitions in `eosio.cdt/libraries/eosio/datastream.hpp`

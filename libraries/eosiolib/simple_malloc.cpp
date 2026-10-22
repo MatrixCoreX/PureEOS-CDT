@@ -1,5 +1,6 @@
 #include <memory>
 #include "core/eosio/check.hpp"
+#include "simple_memory.hpp"
 
 #ifdef EOSIO_NATIVE
    extern "C" {
@@ -14,74 +15,33 @@
 #endif
 
 namespace eosio {
-   struct dsmalloc {
-      inline char* align(char* ptr, uint8_t align_amt) {
-         return (char*)((((size_t)ptr) + align_amt-1) & ~(align_amt-1));
-      }
-
-      inline size_t align(size_t ptr, uint8_t align_amt) {
-         return (ptr + align_amt-1) & ~(align_amt-1);
-      }
-
-      static constexpr uint32_t wasm_page_size = 64*1024;
-
-      dsmalloc() {
-         volatile uintptr_t heap_base = 0; // linker places this at address 0
-         heap = align(*(char**)heap_base, 16);
-         last_ptr = heap;
-
-         next_page = CURRENT_MEMORY;
-      }
-
-      char* operator()(size_t sz, uint8_t align_amt=16) {
-         if (sz == 0)
-            return NULL;
-
-         char* ret = last_ptr;
-         last_ptr = align(last_ptr+sz, align_amt);
-
-         size_t pages_to_alloc = sz >> 16;
-         next_page += pages_to_alloc;
-         if ((next_page << 16) <= (size_t)last_ptr) {
-            next_page++;
-            pages_to_alloc++;
-         }
-         eosio::check(GROW_MEMORY(pages_to_alloc) != -1, "failed to allocate pages");
-         return ret;
-      }
-
-      char*  heap;
-      char*  last_ptr;
-      size_t offset;
-      size_t next_page;
+   struct wasm_memory {
+      size_t pages() const { return CURRENT_MEMORY; }
+      bool grow(size_t count) { return GROW_MEMORY(count) != size_t(-1); }
+      char* pointer(size_t offset) const { return reinterpret_cast<char*>(offset); }
+      size_t offset(const void* ptr) const { return reinterpret_cast<size_t>(ptr); }
    };
-   dsmalloc _dsmalloc;
+   static size_t initial_heap() {
+      volatile uintptr_t heap_base = 0; // linker places the heap pointer at address 0
+      return *reinterpret_cast<size_t*>(heap_base);
+   }
+   wasm_memory _ds_memory;
+   detail::simple_memory<wasm_memory> _dsmalloc(_ds_memory, initial_heap());
 } // ns eosio
 
 extern "C" {
 
 void* malloc(size_t size) {
-   void* ret = eosio::_dsmalloc(size);
-   return ret;
+   return eosio::_dsmalloc.allocate(size);
 }
 
 void* memset(void*,int,size_t);
 void* calloc(size_t count, size_t size) {
-   if (void* ptr = eosio::_dsmalloc(count*size)) {
-      memset(ptr, 0, count*size);
-      return ptr;
-   }
-   return nullptr;
+   return eosio::_dsmalloc.zeroed(count, size);
 }
 
 void* realloc(void* ptr, size_t size) {
-   if (void* result = eosio::_dsmalloc(size)) {
-      // May read out of bounds, but that's okay, as the
-      // contents of the memory are undefined anyway.
-      memmove(result, ptr, size);
-      return result;
-   }
-   return nullptr;
+   return eosio::_dsmalloc.reallocate(ptr, size);
 }
 
 void free(void* ptr) {}

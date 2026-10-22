@@ -1,0 +1,13 @@
+# Relocate a separate SDK; never install over the official package or PATH.
+if(NOT PUREEOS_CDT_ROOT)
+  message(FATAL_ERROR "PUREEOS_CDT_ROOT must identify the isolated modified SDK")
+endif()
+list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES PUREEOS_CDT_ROOT CDT_ROOT)
+include("${PUREEOS_CDT_ROOT}/lib/cmake/cdt/CDTWasmToolchain.cmake")
+set(CMAKE_C_COMPILER "${PUREEOS_CDT_ROOT}/bin/cdt-cc")
+set(CMAKE_CXX_COMPILER "${PUREEOS_CDT_ROOT}/bin/cdt-cpp")
+set(CMAKE_ASM_COMPILER "${PUREEOS_CDT_ROOT}/bin/cdt-cc")
+set(WASM_LINKER "${PUREEOS_CDT_ROOT}/bin/cdt-ld")
+set(CMAKE_C_LINK_EXECUTABLE "${WASM_LINKER} <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+set(CMAKE_CXX_LINK_EXECUTABLE "${WASM_LINKER} <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>")
+set(CMAKE_FIND_ROOT_PATH "${PUREEOS_CDT_ROOT}")

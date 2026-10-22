@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import re
+import tempfile
 
 from printer import Printer as P
 from errors import TestFailure
@@ -42,21 +43,40 @@ class Test(ABC):
         pass
 
     def run(self):
+        self.success = False
         cf = self.test_json.get("compile_flags")
         args = cf if cf else []
         args = [arg.replace("{cwd}", self.test_suite.directory) for arg in args]
 
         cdt_cpp = os.path.join(self.test_suite.cdt_path, "cdt-cpp")
-        self._run(cdt_cpp, args)
+        # A source can have multiple flag/ABI variants. Pool workers previously
+        # shared one cwd and overwrote the same .o/.wasm/.abi files, including
+        # while another worker compared them. Keep every case's artifacts in a
+        # unique directory, and restore cwd for the next job in this process.
+        previous = os.getcwd()
+        self.output_directory = tempfile.mkdtemp(prefix="cdt-" + self.name + "-")
+        try:
+            os.chdir(self.output_directory)
+            self._run(cdt_cpp, args)
+        finally:
+            os.chdir(previous)
 
     def handle_test_result(self, res: subprocess.CompletedProcess, expected_pass=True):
+        self.success = False
         stdout = res.stdout.decode("utf-8").strip()
         stderr = res.stderr.decode("utf-8").strip()
 
         P.print(stdout, verbose=True)
         P.print(stderr, verbose=True)
 
-        if expected_pass and res.returncode > 0:
+        # A crash is not a successful build OR an expected compiler diagnostic.
+        if res.returncode < 0:
+            raise TestFailure(
+                f"{self.fullname} terminated by signal {-res.returncode}: {stderr}",
+                failing_test=self,
+            )
+
+        if expected_pass and res.returncode != 0:
             self.success = False
             raise TestFailure(
                 f"{self.fullname} failed with the following stderr {stderr}",
@@ -77,7 +97,7 @@ class Test(ABC):
     def handle_expecteds(self, res: subprocess.CompletedProcess):
         expected = self.test_json["expected"]
 
-        if expected.get("exit-code"):
+        if "exit-code" in expected:
             exit_code = expected["exit-code"]
 
             if res.returncode != exit_code:

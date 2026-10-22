@@ -3,6 +3,8 @@
  *  @copyright defined in eos/LICENSE
  */
 #pragma once
+#include <cstdint>
+#include "check.hpp"
 
 namespace eosio {
    /**
@@ -223,13 +225,21 @@ namespace eosio {
         */
        template<typename DataStream>
        friend DataStream& operator >> ( DataStream& ds, unsigned_int& vi ){
-         uint64_t v = 0; char b = 0; uint8_t by = 0;
-         do {
+         uint32_t v = 0;
+         for (unsigned byte = 0; byte < 5; ++byte) {
+            char b = 0;
             ds.get(b);
-            v |= uint32_t(uint8_t(b) & 0x7f) << by;
-            by += 7;
-         } while( uint8_t(b) & 0x80 );
-         vi.value = static_cast<uint32_t>(v);
+            const auto bits = static_cast<uint8_t>(b);
+            // Check BEFORE shifting: byte five contains only four value bits,
+            // and a sixth byte cannot belong to a uint32. Preserve vi on error.
+            eosio::check(byte != 4 || (bits & 0xf0) == 0, "varuint32 overflow");
+            v |= uint32_t(bits & 0x7f) << (byte * 7);
+            if (!(bits & 0x80)) {
+               vi.value = v;
+               return ds;
+            }
+         }
+         eosio::check(false, "varuint32 overflow");
          return ds;
        }
 
@@ -430,7 +440,7 @@ namespace eosio {
         */
        template<typename DataStream>
        friend DataStream& operator << ( DataStream& ds, const signed_int& v ){
-         uint32_t val = uint32_t((v.value<<1) ^ (v.value>>31));
+         uint32_t val = (uint32_t(v.value) << 1) ^ (v.value < 0 ? UINT32_MAX : 0);
          do {
             uint8_t b = uint8_t(val) & 0x7f;
             val >>= 7;
@@ -450,13 +460,9 @@ namespace eosio {
         */
        template<typename DataStream>
        friend DataStream& operator >> ( DataStream& ds, signed_int& vi ){
-         uint32_t v = 0; char b = 0; int by = 0;
-         do {
-            ds.get(b);
-            v |= uint32_t(uint8_t(b) & 0x7f) << by;
-            by += 7;
-         } while( uint8_t(b) & 0x80 );
-         vi.value = (v>>1) ^ (~(v&1)+1ull);
+         unsigned_int v;
+         ds >> v;
+         vi.value = (v.value & 1) ? -int32_t(v.value >> 1) - 1 : int32_t(v.value >> 1);
          return ds;
        }
 

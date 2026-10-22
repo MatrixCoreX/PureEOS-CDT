@@ -70,6 +70,6 @@ class TestRunner:
 
         for ts in self.test_suites:
             for t in ts.tests:
-                test_map[t.name] = t
+                test_map[t.fullname] = t
 
         self.test_map = test_map

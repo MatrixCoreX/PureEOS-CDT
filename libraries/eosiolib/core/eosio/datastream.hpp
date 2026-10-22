@@ -16,6 +16,7 @@
 #include <string>
 #include <optional>
 #include <variant>
+#include <limits>
 
 #include <string.h>
 
@@ -43,14 +44,19 @@ class datastream {
        * @param s - The size of the buffer
        */
       datastream( T start, size_t s )
-      :_start(start),_pos(start),_end(start+s){}
+      :_start(start),_size(s){
+         eosio::check(s == 0 || start != T{}, "datastream null buffer");
+      }
 
      /**
       *  Skips a specified number of bytes from this stream
       *
       *  @param s - The number of bytes to skip
       */
-      inline void skip( size_t s ){ _pos += s; }
+      inline void skip( size_t s ){
+         eosio::check(s <= remaining(), "datastream attempted to skip past the end");
+         _offset += s;
+      }
 
      /**
       *  Reads a specified number of bytes from the stream into a buffer
@@ -60,9 +66,9 @@ class datastream {
       *  @return true
       */
       inline bool read( void* d, size_t s ) {
-        eosio::check( size_t(_end - _pos) >= (size_t)s, "datastream attempted to read past the end" );
-        memcpy( d, _pos, s );
-        _pos += s;
+        eosio::check(s <= remaining(), "datastream attempted to read past the end");
+        if (s) memcpy(d, _start + _offset, s);
+        _offset += s;
         return true;
       }
 
@@ -74,10 +80,7 @@ class datastream {
       *  @return true
       */
       inline bool write( const char* d, size_t s ) {
-        eosio::check( _end - _pos >= (int32_t)s, "datastream attempted to write past the end" );
-        memcpy( (void*)_pos, d, s );
-        _pos += s;
-        return true;
+        return write(static_cast<const void*>(d), s);
       }
 
      /**
@@ -87,8 +90,8 @@ class datastream {
       *  @return true
       */
       inline bool write( char d ) {
-        eosio::check( _end - _pos >= 1, "datastream attempted to write past the end" );
-        *_pos++ = d;
+        eosio::check(remaining() != 0, "datastream attempted to write past the end");
+        _start[_offset++] = d;
         return true;
       }
 
@@ -100,9 +103,9 @@ class datastream {
       *  @return true
       */
       inline bool write( const void* d, size_t s ) {
-        eosio::check( _end - _pos >= (int32_t)s, "datastream attempted to write past the end" );
-        memcpy( (void*)_pos, d, s );
-        _pos += s;
+        eosio::check(s <= remaining(), "datastream attempted to write past the end");
+        if (s) memcpy((void*)(_start + _offset), d, s);
+        _offset += s;
         return true;
       }
 
@@ -113,9 +116,8 @@ class datastream {
       *  @return true
       */
       inline bool put(char c) {
-        eosio::check( _pos < _end, "put" );
-        *_pos = c;
-        ++_pos;
+        eosio::check(remaining() != 0, "put");
+        _start[_offset++] = c;
         return true;
       }
 
@@ -135,9 +137,8 @@ class datastream {
       */
       inline bool get( char& c )
       {
-        eosio::check( _pos < _end, "get" );
-        c = *_pos;
-        ++_pos;
+        eosio::check(remaining() != 0, "get");
+        c = _start[_offset++];
         return true;
       }
 
@@ -146,8 +147,8 @@ class datastream {
       *
       *  @return T - The current position of the stream
       */
-      T pos()const { return _pos; }
-      inline bool valid()const { return _pos <= _end && _pos >= _start;  }
+      T pos()const { return _offset ? _start + _offset : _start; }
+      inline bool valid()const { return _offset <= _size; }
 
      /**
       *  Sets the position within the current stream
@@ -156,21 +157,25 @@ class datastream {
       *  @return true if p is within the range
       *  @return false if p is not within the rawnge
       */
-      inline bool seekp(size_t p) { _pos = _start + p; return _pos <= _end; }
+      inline bool seekp(size_t p) {
+         if (p > _size) return false;
+         _offset = p;
+         return true;
+      }
 
      /**
       *  Gets the position within the current stream
       *
       *  @return p - The position within the current stream
       */
-      inline size_t tellp()const      { return size_t(_pos - _start); }
+      inline size_t tellp()const      { return _offset; }
 
      /**
       *  Returns the number of remaining bytes that can be read/skipped
       *
       *  @return size_t - The number of remaining bytes
       */
-      inline size_t remaining()const  { return _end - _pos; }
+      inline size_t remaining()const  { return _size - _offset; }
     private:
       /**
        * The start position of the buffer
@@ -179,11 +184,11 @@ class datastream {
       /**
        * The current position of the buffer
        */
-      T _pos;
+      size_t _offset = 0;
       /**
        * The end position of the buffer
        */
-      T _end;
+      size_t _size;
 };
 
 /**
@@ -205,7 +210,11 @@ class datastream<size_t> {
       *  @param s - The amount of size to increase
       *  @return true
       */
-     inline bool     skip( size_t s )                 { _size += s; return true;  }
+     inline bool     skip( size_t s ) {
+        eosio::check(s <= std::numeric_limits<size_t>::max() - _size, "datastream size overflow");
+        _size += s;
+        return true;
+     }
 
      /**
       *  Increment the size by s. This behaves the same as skip( size_t s )
@@ -213,7 +222,7 @@ class datastream<size_t> {
       *  @param s - The amount of size to increase
       *  @return true
       */
-     inline bool     write( const char* ,size_t s )  { _size += s; return true;  }
+     inline bool     write( const char* ,size_t s )  { return skip(s); }
 
      /**
       *  Increment the size by s. This behaves the same as skip( size_t s )
@@ -221,7 +230,7 @@ class datastream<size_t> {
       *  @param s - The amount of size to increase
       *  @return true
       */
-     inline bool     write( char )  { _size++; return true;  }
+     inline bool     write( char )  { return skip(1); }
 
      /**
       *  Increment the size by s. This behaves the same as skip( size_t s )
@@ -229,14 +238,14 @@ class datastream<size_t> {
       *  @param s - The amount of size to increase
       *  @return true
       */
-     inline bool     write( const void* ,size_t s )  { _size += s; return true;  }
+     inline bool     write( const void* ,size_t s )  { return skip(s); }
 
      /**
       *  Increment the size by one
       *
       *  @return true
       */
-     inline bool     put(char )                      { ++_size; return  true;    }
+     inline bool     put(char )                      { return skip(1); }
 
      /**
       *  Check validity. It's always valid
@@ -301,9 +310,12 @@ template<typename Stream, typename T>
 inline datastream<Stream>& operator>>(datastream<Stream>& ds, std::list<T>& l) {
    unsigned_int s;
    ds >> s;
-   l.resize(s.value);
-   for( auto& i : l )
-      ds >> i;
+   std::list<T> decoded;
+   for (uint32_t i = 0; i < s.value; ++i) {
+      decoded.emplace_back();
+      ds >> decoded.back();
+   }
+   l.swap(decoded);
    return ds;
 }
 
@@ -335,9 +347,12 @@ template<typename Stream, typename T>
 inline datastream<Stream>& operator>>(datastream<Stream>& ds, std::deque<T>& d) {
    unsigned_int s;
    ds >> s;
-   d.resize(s.value);
-   for( auto& i : d )
-      ds >> i;
+   std::deque<T> decoded;
+   for (uint32_t i = 0; i < s.value; ++i) {
+      decoded.emplace_back();
+      ds >> decoded.back();
+   }
+   d.swap(decoded);
    return ds;
 }
 
@@ -740,6 +755,7 @@ template<typename Stream, typename T,
 datastream<Stream>& operator >> ( datastream<Stream>& ds, std::vector<T>& v ) {
    unsigned_int s;
    ds >> s;
+   eosio::check(s.value <= ds.remaining() / sizeof(T), "vector length exceeds datastream");
    v.resize( s.value );
    ds.read( (char*)v.data(), v.size()*sizeof(T) );
    return ds;
@@ -759,9 +775,17 @@ template<typename Stream, typename T,
 datastream<Stream>& operator >> ( datastream<Stream>& ds, std::vector<T>& v ) {
    unsigned_int s;
    ds >> s;
-   v.resize(s.value);
-   for( auto& i : v )
-      ds >> i;
+   // Unlike primitive elements, a T can consume zero bytes. Do not invent a
+   // wire-size lower bound. Deserialize each element before growing the vector
+   // so a forged count cannot force a huge allocation before a truncated body.
+   v.clear();
+   for (uint32_t i = 0; i < s.value; ++i) {
+      // Match allocator value-initialization (T()), not aggregate list
+      // initialization: a member may have an explicit default constructor.
+      T element = T();
+      ds >> element;
+      v.push_back(std::move(element));
+   }
    return ds;
 }
 
@@ -795,6 +819,7 @@ template<typename Stream, typename T>
 datastream<Stream>& operator >> ( datastream<Stream>& ds, std::basic_string<T>& s ) {
    unsigned_int v;
    ds >> v;
+   eosio::check(v.value <= ds.remaining() / sizeof(T), "string length exceeds datastream");
    s.resize(v.value);
    ds.read(s.data(), s.size()*sizeof(T));
    return ds;
@@ -830,6 +855,7 @@ template<typename Stream>
 datastream<Stream>& operator >> ( datastream<Stream>& ds, std::basic_string<uint8_t>& s ) {
    unsigned_int v;
    ds >> v;
+   eosio::check(v.value <= ds.remaining(), "string length exceeds datastream");
    s.resize(v.value);
    ds.read(s.data(), s.size());
    return ds;

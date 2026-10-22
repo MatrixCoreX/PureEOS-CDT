@@ -14,6 +14,13 @@ from testrunner import TestRunner
 from testsuite import TestSuite
 
 
+def positive_jobs(value):
+    result = int(value)
+    if result < 1:
+        raise argparse.ArgumentTypeError("jobs must be at least 1")
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -27,8 +34,8 @@ def main():
     parser.add_argument(
         "-j",
         "--jobs",
-        type=int,
-        default=int(os.cpu_count() / 2),
+        type=positive_jobs,
+        default=max(1, (os.cpu_count() or 1) // 2),
         help="Number of threads to use for parallel execution (defaults to half of the system max)",
     )
     parser.add_argument(
@@ -51,6 +58,7 @@ def main():
     P.verbose = args.verbose
 
     abs_test_directory = os.path.abspath(args.test_directory)
+    args.cdt = os.path.abspath(args.cdt)
 
     temp_dir = tempfile.mkdtemp()
 
