@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Materialize a relocatable DEVELOPMENT SDK, not a stable release or LLVM rebuild."""
+import argparse
+from datetime import datetime, timezone
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import stat
+import subprocess
+import tarfile
+import traceback
+
+
+def sha(path):
+    with Path(path).open('rb') as stream: return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def materialize(source, destination, allowed_roots, *, overlay=False):
+    """Follow only explicit SDK roots; never preserve host-absolute links."""
+    source, destination = Path(source), Path(destination)
+    roots = tuple(Path(p).resolve(strict=True) for p in allowed_roots)
+    if any(destination.resolve().is_relative_to(root) for root in roots):
+        raise ValueError('Materialized output must be independent of SDK inputs')
+    destination.mkdir(exist_ok=overlay)
+    if destination.is_symlink(): raise ValueError('Output must not be a directory link')
+    files = {}
+    def walk(current, target, ancestors):
+        resolved = current.resolve(strict=True)
+        if not any(resolved.is_relative_to(root) for root in roots):
+            raise ValueError('SDK link escapes explicit input roots: '+str(current))
+        if resolved.is_dir():
+            if resolved in ancestors: raise ValueError('Cyclic SDK directory link')
+            target.mkdir(exist_ok=True)
+            for item in sorted(resolved.iterdir()): walk(item, target/item.name, ancestors | {resolved})
+        elif resolved.is_file():
+            expected = sha(resolved)
+            shutil.copyfile(resolved, target)
+            target.chmod(stat.S_IMODE(resolved.stat().st_mode) & 0o777)
+            if sha(target) != expected: raise RuntimeError('SDK changed during materialization')
+            files[str(target.relative_to(destination))] = dict(source=str(resolved), sha256=expected)
+        else: raise ValueError('SDK contains a special file')
+    walk(source, destination, set())
+    return files
+
+
+def main():
+    os.umask(0o077)
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('sdk', 'base-sdk', 'wasm-evidence', 'node-source', 'output'):
+        parser.add_argument('--'+name, type=Path, required=True)
+    args = parser.parse_args()
+    for name in ('sdk', 'base_sdk', 'wasm_evidence', 'node_source'):
+        setattr(args, name, getattr(args, name).resolve(strict=True))
+    args.output = args.output.resolve()
+    root = Path(__file__).resolve().parents[2]
+    if any(args.output == p or args.output.is_relative_to(p) for p in (args.sdk, args.base_sdk, root)):
+        raise ValueError('Output must be independent of the SDK and source inputs')
+    args.output.mkdir(exist_ok=False)
+    report = dict(status='running', release_ready=False, scope=__doc__, jobs=[],
+        source_commit=subprocess.check_output(['git', '-C', root, 'rev-parse', 'HEAD'], text=True).strip(),
+        started_utc=datetime.now(timezone.utc).isoformat(), package_script_sha256=sha(__file__))
+    def save():
+        pending = args.output/'report.pending'; pending.write_text(json.dumps(report, indent=2))
+        pending.replace(args.output/'report.json')
+    def run(name, command, timeout=600):
+        with (args.output/(name+'.log')).open('x') as stream:
+            result = subprocess.run(list(map(str, command)), stdout=stream, stderr=subprocess.STDOUT, timeout=timeout)
+        report['jobs'].append(dict(name=name, exit_code=result.returncode)); save()
+        if result.returncode: raise RuntimeError(name+' failed; preserve this candidate')
+    try:
+        save()
+        previous = json.loads(args.wasm_evidence.read_text())
+        assert previous['status'] == 'passed'
+        for name in ('simple_malloc.cpp', 'simple_memory.hpp', 'core/eosio/varint.hpp', 'core/eosio/datastream.hpp'):
+            suffix = '/libraries/eosiolib/'+name
+            old = [d for p, d in previous['inputs_sha256'].items() if p.endswith(suffix)]
+            assert len(old) == 1 and sha(root/('libraries/eosiolib/'+name)) == old[0], 'SDK production source changed'
+        expected_runtime = [d for p, d in previous['artifacts_sha256'].items() if p.endswith('/sdk/lib/libeosio_dsm.a')]
+        assert expected_runtime == [sha(args.sdk/'lib/libeosio_dsm.a')]
+        # All current core headers, not merely the two modified headers.
+        for p in (root/'libraries/eosiolib/core').rglob('*'):
+            if p.is_file(): assert sha(p) == sha(args.sdk/'include/eosiolib/core'/p.relative_to(root/'libraries/eosiolib/core'))
+        payload = args.output/'payload'; payload.mkdir()
+        sdk = payload/'pureeos-cdt-candidate'
+        # Retain the complete official SDK layout, scripts and third-party
+        # licenses, not only the minimal headers/tools used by the test stage.
+        files = materialize(args.base_sdk, sdk, (args.base_sdk,))
+        files.update(materialize(args.sdk, sdk, (args.sdk, args.base_sdk), overlay=True))
+        for name, template in (('cdt-config.cmake', 'cdt-config.cmake'),
+                ('CDTWasmToolchain.cmake', 'CDTWasmToolchain.cmake.in')):
+            source = root/'modules'/template
+            text = source.read_text().replace('@VERSION_FULL@', '5.0.0-dev1.1').replace('@SYSROOT_DIR@', '')
+            assert '@CDT_ROOT_DIR@' not in text and '@VERSION_FULL@' not in text
+            path = sdk/'lib/cmake/cdt'/name; path.write_text(text)
+            files['lib/cmake/cdt/'+name] = dict(source=str(source), source_sha256=sha(source), sha256=sha(path))
+        report.update(sdk_files=len(files), sdk_manifest_sha256=None)
+        assert files and not any(p.is_symlink() for p in sdk.rglob('*'))
+        (args.output/'materialized-files.json').write_text(json.dumps(files, indent=2))
+        report['sdk_manifest_sha256'] = sha(args.output/'materialized-files.json'); save()
+        # Rename the entire prefix before the first invocation. Compiler/SDK
+        # checks then run without reintroducing the staging prefix via PATH.
+        relocated = payload/'relocated-pureeos-cdt-candidate'; sdk.rename(relocated); sdk = relocated
+        run('compiler-version', [sdk/'bin/cdt-cpp', '--version'])
+        negative = args.output/'original-cmake-negative.log'
+        with negative.open('x') as stream:
+            old = subprocess.run(['cmake', '-S', str(root/'tests/hardening/sdk_relocation_fixture'),
+                '-B', str(args.output/'original-cmake-negative'),
+                '-DCMAKE_TOOLCHAIN_FILE='+str(args.sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
+                '-Dcdt_DIR='+str(args.sdk/'lib/cmake/cdt'), '-DPUREEOS_EXPECTED_SDK='+str(args.sdk),
+                '-DPUREEOS_TEST_CONTRACT='+str(args.node_source/'tests/fixtures/cdt_modern_smoke.cpp')],
+                stdout=stream, stderr=subprocess.STDOUT, timeout=120)
+        assert old.returncode > 0 and any(s in negative.read_text() for s in
+            ('/usr/bin/cdt-cpp', 'CDT resolved outside', 'CDTMacros')), 'Original failure not reproduced'
+        report['original_cmake_negative_control'] = dict(expected_failure=True, exit_code=old.returncode,
+            toolchain_sha256=sha(args.sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
+            config_sha256=sha(args.sdk/'lib/cmake/cdt/cdt-config.cmake'))
+        cmake_build = args.output/'cmake-smoke'
+        run('relocated-cmake-configure', ['cmake', '-S', root/'tests/hardening/sdk_relocation_fixture',
+            '-B', cmake_build, '-DCMAKE_TOOLCHAIN_FILE='+str(sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
+            '-Dcdt_DIR='+str(sdk/'lib/cmake/cdt'), '-DPUREEOS_EXPECTED_SDK='+str(sdk),
+            '-DPUREEOS_TEST_CONTRACT='+str(args.node_source/'tests/fixtures/cdt_modern_smoke.cpp')])
+        run('relocated-cmake-build', ['cmake', '--build', cmake_build, '--parallel', '1'])
+        assert (cmake_build/'cdtcompat.wasm').read_bytes()[:8] == b'\x00asm\x01\x00\x00\x00'
+        assert sha(cmake_build/'cdtcompat.abi') == sha(args.wasm_evidence.parent/'cdtcompat/cdtcompat.abi')
+        report['cmake_fixture_sha256'] = {p.name: sha(p) for p in
+            (cmake_build/'cdtcompat.wasm', cmake_build/'cdtcompat.abi')}
+        run('relocated-toolchain-three-rounds', ['python3', root/'tests/hardening/run_toolchain_suite.py',
+            '--sdk', sdk, '--output', args.output/'toolchain'], 1200)
+        detail = json.loads((args.output/'toolchain/report.json').read_text())
+        assert detail['status'] == 'passed' and len(detail['rounds']) == 3
+        assert all(r['cases'] == 32 and r['failed'] == 0 for r in detail['rounds'])
+        run('relocated-sdk-native-units', ['python3', root/'tests/hardening/run_sdk_native_units.py',
+            '--sdk', sdk, '--output', args.output/'sdk-units'], 1200)
+        detail = json.loads((args.output/'sdk-units/report.json').read_text())
+        assert detail['status'] == 'passed' and len(detail['jobs']) == 72
+        report['fixtures'] = {}
+        for name, contract in (('cdtcompat', 'tests/fixtures/cdt_modern_smoke.cpp'),
+                ('complexbench', 'unittests/test-contracts/complex_benchmark/complex_benchmark.cpp')):
+            directory = args.output/name; directory.mkdir(); target = directory/(name+'.wasm')
+            run('relocated-compile-'+name, [sdk/'bin/cdt-cpp', '-O3', '-abigen', '--sysroot='+str(sdk),
+                '-I'+str(sdk/'include'), '-contract='+name, args.node_source/contract, '-o', target])
+            for artifact in (target, target.with_suffix('.abi')):
+                original = args.wasm_evidence.parent/name/artifact.name
+                assert sha(artifact) == sha(original), 'Relocated SDK changed actual fixture bytes: '+artifact.name
+                report['fixtures'][name+'/'+artifact.name] = sha(artifact)
+        assert all(sha(sdk/p) == v['sha256'] and sha(v['source']) == v.get('source_sha256', v['sha256']) for p, v in files.items())
+        provenance = dict(scope=__doc__, stable_release=False, source_commit=report['source_commit'],
+            upstream_compiler_unchanged=True, full_llvm_rebuild=False,
+            hardened_runtime_sha256=expected_runtime[0], files_sha256={p: v['sha256'] for p, v in files.items()},
+            acceptance='Relocated compile/link/ABI/native checks only; joint final node release still required')
+        (sdk/'PUREEOS_SDK_PROVENANCE.json').write_text(json.dumps(provenance, indent=2))
+        archive = args.output/'pureeos-cdt-development-candidate.tar.gz'
+        with tarfile.open(archive, 'x:gz', compresslevel=1) as stream:
+            for p in sorted(sdk.rglob('*')):
+                assert not p.is_symlink()
+                stream.add(p, arcname='pureeos-cdt-candidate/'+str(p.relative_to(sdk)), recursive=False)
+        with tarfile.open(archive) as stream:
+            for p, v in files.items():
+                member = stream.getmember('pureeos-cdt-candidate/'+p)
+                assert member.isfile() and hashlib.file_digest(stream.extractfile(member), 'sha256').hexdigest() == v['sha256']
+        report.update(status='passed', package=dict(local=str(archive), bytes=archive.stat().st_size, sha256=sha(archive)),
+            boundary='SDK packaging/relocation passed, NOT stable node/CDT joint release')
+    except Exception as error:
+        report.update(status='failed', error=str(error), traceback=traceback.format_exc())
+    report['finished_utc'] = datetime.now(timezone.utc).isoformat(); save()
+    return 0 if report['status'] == 'passed' else 1
+
+
+if __name__ == '__main__': raise SystemExit(main())

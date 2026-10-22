@@ -33,6 +33,12 @@ python3 tests/hardening/run_native_tests.py --baseline /path/to/unmodified-cdt -
 程序、SDK 或系统合约目录；各自 `--help` 列出参数。正式验收须绑定相同最终候选
 的源码、工具链、程序与合约摘要，并保留失败记录。
 
+开发候选打包使用 `tests/hardening/package_sdk_candidate.py`（参数见 `--help`）。
+它将测试 SDK 的绝对链接转成独立文件，保留完整工具、脚本和第三方许可证，
+并按 CMake 文件自身位置定位 SDK。打包必须经过实际搬迁后的 CMake、工具链、
+原生 SDK 和真实合约编译对照；测试目录不能直接冒充可安装发行包。
+此入口仍需最终节点联合验收，不生成稳定标签，也不修改上游预览编译器版本。
+
 ## 来源与许可
 
 保留继承的 CDT/第三方源码和版权声明，许可见 [LICENSE](LICENSE) 及各组件目录。

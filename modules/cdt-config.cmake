@@ -1,5 +1,7 @@
 if(CDT_ROOT STREQUAL "" OR NOT CDT_ROOT)
-   set(CDT_ROOT "@CDT_ROOT_DIR@")
+   # Package config lives at <prefix>/lib/cmake/cdt. Derive the relocated
+   # prefix instead of retaining the build/install machine's absolute path.
+   get_filename_component(CDT_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
 endif()
 
 set(CDT_VERSION "@VERSION_FULL@")
