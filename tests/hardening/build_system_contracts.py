@@ -8,17 +8,31 @@ from pathlib import Path
 import subprocess
 
 
+def contract_source(path):
+    requested = Path(path).resolve(strict=True)
+    def actual(root):
+        return ((root/'CMakeLists.txt').is_file()
+            and (root/'eosio.system/src/eosio.system.cpp').is_file()
+            and (root/'eosio.token/src/eosio.token.cpp').is_file())
+    matches = [p for p in (requested, requested/'contracts') if actual(p)]
+    if len(matches) != 1:
+        raise ValueError('Expected exactly one reference-contract source (repository root or contracts/ directory)')
+    return matches[0]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--sdk', type=Path, required=True)
-    parser.add_argument('--contracts', type=Path, required=True)
+    parser.add_argument('--contracts', type=Path, required=True, help='Repository root or its contracts/ source directory')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    sdk, source, output = args.sdk.resolve(), args.contracts.resolve(), args.output.resolve()
+    sdk, source, output = args.sdk.resolve(), contract_source(args.contracts), args.output.resolve()
+    if output.is_relative_to(source): raise ValueError('Keep generated contracts outside the source tree')
     output.mkdir(parents=True, exist_ok=False)
     root = Path(__file__).resolve().parents[2]
     report = dict(status='running', scope='All reference contracts rebuilt with modified SDK; runtime and first-release gates separate',
-                  started_utc=datetime.now(timezone.utc).isoformat(), jobs=[])
+                  started_utc=datetime.now(timezone.utc).isoformat(), jobs=[],
+                  requested_source=str(args.contracts.resolve()), actual_source=str(source))
     def sha(path):
         with Path(path).open('rb') as stream: return hashlib.file_digest(stream, 'sha256').hexdigest()
     sources = [p for p in source.rglob('*') if p.is_file() and p.suffix in ('.cpp', '.h', '.hpp', '.txt', '.cmake', '.in')]
