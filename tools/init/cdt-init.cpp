@@ -1,35 +1,18 @@
-// Declares clang::SyntaxOnlyAction.
-#include "clang/Frontend/FrontendActions.h"
-#include "clang/Tooling/CommonOptionsParser.h"
-#include "clang/Tooling/Tooling.h"
-#include "clang/ASTMatchers/ASTMatchers.h"
-#include "clang/ASTMatchers/ASTMatchFinder.h"
-#include "clang/AST/DeclCXX.h"
-#include "clang/AST/DeclTemplate.h"
-#include "clang/AST/Expr.h"
-#include "clang/Basic/Builtins.h"
-#include "llvm/Support/FileSystem.h"
-#include "eosio/utils.hpp"
-#include "eosio/gen.hpp"
-#include "eosio/whereami/whereami.hpp"
-#include "eosio/abi.hpp"
-
+// Standalone project scaffolding; does not need the compiler's LLVM runtime.
 #include <exception>
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <memory>
-#include <set>
-#include <map>
-#include <chrono>
-#include <ctime>
+#include <regex>
+#include <stdexcept>
+#include <string>
 
-#include "llvm/Support/CommandLine.h"
-using namespace clang::tooling;
-using namespace clang::ast_matchers;
-using namespace llvm;
-using namespace eosio;
-using namespace eosio::cdt;
+#ifndef PUREEOS_CDT_INIT_VERSION
+#define PUREEOS_CDT_INIT_VERSION "@VERSION_FULL@"
+#endif
+
+namespace fs = std::filesystem;
 
 struct project {
    std::string project_name;
@@ -37,16 +20,16 @@ struct project {
    bool        bare;
 
    project( const std::string& pn, const std::string& p, bool b ) : project_name(pn), path(p), bare(b) {
-      llvm::sys::fs::create_directory(path);
+      if (!fs::create_directory(path))
+         throw std::runtime_error("Project already exists; refusing to overwrite: " + path);
       if (!bare) {
-         llvm::sys::fs::create_directory(path+"/src");
-         llvm::sys::fs::create_directory(path+"/include");
-         llvm::sys::fs::create_directory(path+"/ricardian");
-         llvm::sys::fs::create_directory(path+"/build");
+         fs::create_directory(path+"/src");
+         fs::create_directory(path+"/include");
+         fs::create_directory(path+"/ricardian");
+         fs::create_directory(path+"/build");
       }
    }
 
-   std::string cdt_root = "/usr/local";
    const std::string cpp = "#include <@.hpp>\n"
                            "ACTION @::hi( name nm ) {\n"
                            "   /* fill in action body */\n"
@@ -65,23 +48,26 @@ struct project {
    const std::string ricardian = "<h1 class=\"contract\"> hi </h1>\n\n"
                                  "Stub for hi action's ricardian contract";
 
-   const std::string cmake = "project(@)\n\n"
-                             "find_package(cdt)\n\n"
+   const std::string cmake = "cmake_minimum_required(VERSION 3.20)\n"
+                             "project(@ LANGUAGES CXX)\n\n"
+                             "find_package(cdt CONFIG REQUIRED)\n\n"
                              "add_contract( @ @ @.cpp )\n"
                              "target_include_directories( @ PUBLIC ${CMAKE_SOURCE_DIR}/../include )\n"
                              "target_ricardian_directory( @ ${CMAKE_SOURCE_DIR}/../ricardian )";
 
-   const std::string cmake_extern = "cmake_minimum_required(VERSION 3.5)\n"
+   const std::string cmake_extern = "cmake_minimum_required(VERSION 3.20)\n"
+                                    "project(@ LANGUAGES NONE)\n"
                                     "include(ExternalProject)\n"
                                     "# if no cdt root is given use default path\n"
                                     "if(CDT_ROOT STREQUAL \"\" OR NOT CDT_ROOT)\n"
-                                    "   find_package(cdt)\n"
+                                    "   find_package(cdt CONFIG REQUIRED)\n"
                                     "endif()\n\n"
                                     "ExternalProject_Add(\n"
                                     "   @_project\n"
                                     "   SOURCE_DIR ${CMAKE_SOURCE_DIR}/src\n"
                                     "   BINARY_DIR ${CMAKE_BINARY_DIR}/@\n"
-                                    "   CMAKE_ARGS -DCMAKE_TOOLCHAIN_FILE=${CDT_ROOT}/lib/cmake/cdt/CDTWasmToolchain.cmake\n"
+                                    "   CMAKE_ARGS \"-DCMAKE_TOOLCHAIN_FILE=${CDT_ROOT}/lib/cmake/cdt/CDTWasmToolchain.cmake\"\n"
+                                    "              \"-Dcdt_DIR=${CDT_ROOT}/lib/cmake/cdt\"\n"
                                     "   UPDATE_COMMAND \"\"\n"
                                     "   PATCH_COMMAND \"\"\n"
                                     "   TEST_COMMAND \"\"\n"
@@ -92,7 +78,7 @@ struct project {
    const std::string readme_cmake = "--- @ Project ---\n\n"
                                     " - How to Build -\n"
                                     "   - cd to 'build' directory\n"
-                                    "   - run the command 'cmake ..'\n"
+                                    "   - run 'cmake .. -DCMAKE_PREFIX_PATH=/path/to/your/cdt/sdk'\n"
                                     "   - run the command 'make'\n\n"
                                     " - After build -\n"
                                     "   - The built smart contract is under the '@' directory in the 'build' directory\n"
@@ -114,16 +100,6 @@ struct project {
       return ss.str();
    }
 
-   std::string replace_cdt_root( const std::string& in ) {
-      std::stringstream ss;
-      for ( char c : in ) {
-         if (c == '%')
-            ss << cdt_root;
-         else
-            ss << c;
-      }
-      return ss.str();
-   }
    std::string replace_include_type( const std::string& in ) {
       std::stringstream ss;
       for ( char c : in ) {
@@ -137,88 +113,99 @@ struct project {
 
    void write_cpp() {
       std::ofstream cpp_out;
+      cpp_out.exceptions(std::ofstream::failbit | std::ofstream::badbit);
       if (bare)
          cpp_out.open(path+"/"+project_name+".cpp");
       else
          cpp_out.open(path+"/src/"+project_name+".cpp");
       cpp_out << replace_include_type(replace_name(cpp));
+      cpp_out.close();
    }
    void write_hpp() {
       std::ofstream hpp_out;
+      hpp_out.exceptions(std::ofstream::failbit | std::ofstream::badbit);
       if (bare)
          hpp_out.open(path+"/"+project_name+".hpp");
       else
          hpp_out.open(path+"/include/"+project_name+".hpp");
       hpp_out << replace_name(hpp);
+      hpp_out.close();
    }
    void write_cmake() {
       if (!bare) {
          std::ofstream cmake_out(path+"/src/CMakeLists.txt");
-         cmake_out << replace_name(replace_cdt_root(cmake));
+         cmake_out.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+         cmake_out << replace_name(cmake);
+         cmake_out.close();
       }
    }
    void write_cmake_extern() {
       if (!bare) {
          std::ofstream cmake_out(path+"/CMakeLists.txt");
-         cmake_out << replace_name(replace_cdt_root(cmake_extern));
+         cmake_out.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+         cmake_out << replace_name(cmake_extern);
+         cmake_out.close();
       }
    }
    void write_ricardian() {
       std::ofstream rc_out;
+      rc_out.exceptions(std::ofstream::failbit | std::ofstream::badbit);
       if (bare)
          rc_out.open(path+"/"+project_name+".contracts.md");
       else
          rc_out.open(path+"/ricardian/"+project_name+".contracts.md");
       rc_out << ricardian;
+      rc_out.close();
    }
    void write_readme() {
       std::ofstream readme_out(path+"/README.txt");
+      readme_out.exceptions(std::ofstream::failbit | std::ofstream::badbit);
       if (bare) {
          readme_out << replace_name(readme_bare);
       } else {
          readme_out << replace_name(readme_cmake);
       }
+      readme_out.close();
    }
 
 };
 
 int main(int argc, const char **argv) {
-
-   cl::SetVersionPrinter([](llvm::raw_ostream& os) {
-        os << "cdt-init version " << "@VERSION_FULL@" << "\n";
-  });
-   cl::OptionCategory cat("cdt-init", "generates an cdt smart contract project");
-
-   cl::opt<bool> bare_opt(
-      "bare",
-      cl::desc("produces only a skeleton smart contract without CMake support"),
-      cl::cat(cat));
-   cl::opt<std::string> project_name(
-      "project",
-      cl::desc("output project name"),
-      cl::Required,
-      cl::cat(cat));
-   cl::opt<std::string> output_dir(
-      "path",
-      cl::desc("directory to place the project"),
-      cl::cat(cat));
-
-   cl::ParseCommandLineOptions(argc, argv, std::string("cdt-proj"));
    try {
+      std::string project_name, output_dir = ".";
+      bool bare_opt = false, project_seen = false, path_seen = false;
+      for (int i = 1; i < argc; ++i) {
+         const std::string arg = argv[i];
+         if (arg == "--help" || arg == "--help-list") {
+            std::cout << "Usage: cdt-init --project=NAME [--path=EXISTING_DIRECTORY] [--bare]\n"
+                         "Creates a NEW project directory; never overwrites an existing one.\n";
+            return 0;
+         }
+         if (arg == "--version") {
+            std::cout << "cdt-init version " << PUREEOS_CDT_INIT_VERSION << "\n";
+            return 0;
+         }
+         if (arg == "--bare") { bare_opt = true; continue; }
+         auto value = [&](const std::string& name, std::string& into, bool& seen) {
+            if (arg != name && arg.rfind(name + "=", 0) != 0) return false;
+            if (seen) throw std::runtime_error("Duplicate option: " + name);
+            seen = true;
+            if (arg == name) {
+               if (++i >= argc) throw std::runtime_error("Missing value for " + name);
+               into = argv[i];
+            } else into = arg.substr(name.size() + 1);
+            if (into.empty()) throw std::runtime_error("Empty value for " + name);
+            return true;
+         };
+         if (value("--project", project_name, project_seen) || value("--path", output_dir, path_seen)) continue;
+         throw std::runtime_error("Unknown option: " + arg);
+      }
       if (!std::regex_match(project_name, std::regex("^[_a-zA-Z][_a-zA-Z0-9]*$"))) {
          throw std::runtime_error("ERROR: invalid identifier: " + project_name + " (ensure that it is a valid C++ identifier)");
       }
-      llvm::SmallString<128> rp;
-      std::string path = output_dir;
-      if (path.empty())
-         path = ".";
-      llvm::sys::fs::real_path(path, rp, false);
-      path = rp.str();
-      if (path.empty()) {
-         llvm::outs() << output_dir+" path not found\n";
-         return -1;
-      }
-      path += "/"+project_name;
+      const auto parent = fs::canonical(output_dir);
+      if (!fs::is_directory(parent)) throw std::runtime_error("Project parent is not a directory");
+      const std::string path = (parent/project_name).string();
 
       project proj(project_name, path, bare_opt);
       proj.write_hpp();
@@ -228,8 +215,8 @@ int main(int argc, const char **argv) {
       proj.write_ricardian();
       proj.write_readme();
    } catch ( std::exception& e ) {
-      std::cout << e.what() << "\n";
-      return -1;
+      std::cerr << e.what() << "\n";
+      return 1;
    }
 
    return 0;

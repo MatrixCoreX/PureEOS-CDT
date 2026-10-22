@@ -11,6 +11,7 @@ import stat
 import subprocess
 import tarfile
 import traceback
+from sdk_archive import archive_sdk
 
 
 def sha(path):
@@ -67,7 +68,7 @@ def main():
     def run(name, command, timeout=600):
         with (args.output/(name+'.log')).open('x') as stream:
             result = subprocess.run(list(map(str, command)), stdout=stream, stderr=subprocess.STDOUT, timeout=timeout)
-        report['jobs'].append(dict(name=name, exit_code=result.returncode)); save()
+        report['jobs'].append(dict(name=name, exit_code=result.returncode, command=list(map(str, command)))); save()
         if result.returncode: raise RuntimeError(name+' failed; preserve this candidate')
     try:
         save()
@@ -95,6 +96,12 @@ def main():
             assert '@CDT_ROOT_DIR@' not in text and '@VERSION_FULL@' not in text
             path = sdk/'lib/cmake/cdt'/name; path.write_text(text)
             files['lib/cmake/cdt/'+name] = dict(source=str(source), source_sha256=sha(source), sha256=sha(path))
+        init_source = root/'tools/init/cdt-init.cpp'
+        run('build-standalone-cdt-init', ['c++', '-std=c++17', '-O2',
+            '-DPUREEOS_CDT_INIT_VERSION="5.0.0-dev1.1+pureeos-dev"', init_source, '-o', sdk/'bin/cdt-init'])
+        files['bin/cdt-init'] = dict(source=str(init_source), source_sha256=sha(init_source), sha256=sha(sdk/'bin/cdt-init'))
+        report['init_compiler'] = subprocess.check_output(['c++', '--version'], text=True).splitlines()[0]
+        report['archive_helper_sha256'] = sha(Path(__file__).with_name('sdk_archive.py'))
         report.update(sdk_files=len(files), sdk_manifest_sha256=None)
         assert files and not any(p.is_symlink() for p in sdk.rglob('*'))
         (args.output/'materialized-files.json').write_text(json.dumps(files, indent=2))
@@ -126,6 +133,16 @@ def main():
         assert sha(cmake_build/'cdtcompat.abi') == sha(args.wasm_evidence.parent/'cdtcompat/cdtcompat.abi')
         report['cmake_fixture_sha256'] = {p.name: sha(p) for p in
             (cmake_build/'cdtcompat.wasm', cmake_build/'cdtcompat.abi')}
+        old_parent = args.output/'original-init-parent'; old_parent.mkdir()
+        run('original-init-generate', [args.base_sdk/'bin/cdt-init', '--project=oldproject', '--path='+str(old_parent)])
+        run('original-init-configure', ['cmake', '-S', old_parent/'oldproject', '-B', args.output/'original-init-build',
+            '-DCMAKE_PREFIX_PATH='+str(sdk)])
+        with (args.output/'original-init-build-negative.log').open('x') as stream:
+            old_init = subprocess.run(['cmake', '--build', str(args.output/'original-init-build'), '--parallel', '1'],
+                stdout=stream, stderr=subprocess.STDOUT, timeout=120)
+        assert old_init.returncode > 0 and 'No cmake_minimum_required' in (args.output/'original-init-build-negative.log').read_text()
+        report['original_init_negative_control'] = dict(expected_failure=True, exit_code=old_init.returncode,
+            original_binary_sha256=sha(args.base_sdk/'bin/cdt-init'))
         run('relocated-toolchain-three-rounds', ['python3', root/'tests/hardening/run_toolchain_suite.py',
             '--sdk', sdk, '--output', args.output/'toolchain'], 1200)
         detail = json.loads((args.output/'toolchain/report.json').read_text())
@@ -148,18 +165,44 @@ def main():
         assert all(sha(sdk/p) == v['sha256'] and sha(v['source']) == v.get('source_sha256', v['sha256']) for p, v in files.items())
         provenance = dict(scope=__doc__, stable_release=False, source_commit=report['source_commit'],
             upstream_compiler_unchanged=True, full_llvm_rebuild=False,
+            rebuilt_native_tools=['cdt-init'], init_compiler=report['init_compiler'],
             hardened_runtime_sha256=expected_runtime[0], files_sha256={p: v['sha256'] for p, v in files.items()},
             acceptance='Relocated compile/link/ABI/native checks only; joint final node release still required')
         (sdk/'PUREEOS_SDK_PROVENANCE.json').write_text(json.dumps(provenance, indent=2))
         archive = args.output/'pureeos-cdt-development-candidate.tar.gz'
-        with tarfile.open(archive, 'x:gz', compresslevel=1) as stream:
-            for p in sorted(sdk.rglob('*')):
-                assert not p.is_symlink()
-                stream.add(p, arcname='pureeos-cdt-candidate/'+str(p.relative_to(sdk)), recursive=False)
+        epoch = int(subprocess.check_output(['git', '-C', root, 'show', '-s', '--format=%ct', report['source_commit']], text=True))
+        archive_sdk(sdk, archive, epoch)
+        replica = args.output/'reproducibility-check.tar.gz'; archive_sdk(sdk, replica, epoch)
+        assert sha(archive) == sha(replica), 'Identical SDK produced different archive bytes'
+        report['reproducible_archive'] = dict(epoch=epoch, identical_sha256=sha(archive), replica=str(replica))
         with tarfile.open(archive) as stream:
+            for member in stream:
+                assert not Path(member.name).is_absolute() and '..' not in Path(member.name).parts
+                assert member.isdir() or member.isfile()
+                assert member.uid == member.gid == 0 and member.mode in (0o644, 0o755)
             for p, v in files.items():
                 member = stream.getmember('pureeos-cdt-candidate/'+p)
                 assert member.isfile() and hashlib.file_digest(stream.extractfile(member), 'sha256').hexdigest() == v['sha256']
+            installation = args.output/'installed'; installation.mkdir()
+            stream.extractall(installation, filter='data')
+        installed = installation/'pureeos-cdt-candidate'
+        assert all(sha(installed/p) == v['sha256'] for p, v in files.items())
+        run('installed-compiler-version', [installed/'bin/cdt-cpp', '--version'])
+        project_parent = args.output/'project with spaces'; project_parent.mkdir()
+        run('installed-init-generate', [installed/'bin/cdt-init', '--project=smoketest', '--path='+str(project_parent)])
+        generated = project_parent/'smoketest'
+        before = {str(p.relative_to(generated)): sha(p) for p in generated.rglob('*') if p.is_file()}
+        run('installed-init-configure', ['cmake', '-S', generated, '-B', args.output/'init-build',
+            '-DCMAKE_PREFIX_PATH='+str(installed)])
+        run('installed-init-build', ['cmake', '--build', args.output/'init-build', '--parallel', '1'])
+        assert (args.output/'init-build/smoketest/smoketest.wasm').read_bytes()[:8] == b'\x00asm\x01\x00\x00\x00'
+        refusal = subprocess.run([installed/'bin/cdt-init', '--project=smoketest', '--path='+str(project_parent)],
+            capture_output=True, text=True, timeout=30)
+        assert refusal.returncode > 0 and 'refusing to overwrite' in refusal.stderr
+        assert all(sha(generated/p) == d for p, d in before.items()), 'Existing project overwritten'
+        report['installed_init'] = dict(generated=True, built=True, existing_project_preserved=True,
+            wasm_sha256=sha(args.output/'init-build/smoketest/smoketest.wasm'))
+        assert all(sha(installed/p) == v['sha256'] and sha(sdk/p) == v['sha256'] for p, v in files.items())
         report.update(status='passed', package=dict(local=str(archive), bytes=archive.stat().st_size, sha256=sha(archive)),
             boundary='SDK packaging/relocation passed, NOT stable node/CDT joint release')
     except Exception as error:
