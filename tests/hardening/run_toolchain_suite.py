@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import traceback
+from hardening_paths import require_cases, resolve_arguments
 
 SOURCE = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SOURCE / 'tools/toolchain-tester'))
@@ -24,6 +25,7 @@ def main():
     parser.add_argument('--sdk', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    resolve_arguments(args,'sdk','output')
     args.output.mkdir(exist_ok=False)
     corpus = SOURCE / 'tests/toolchain'
     inputs = [*sorted(p for p in corpus.rglob('*') if p.is_file()),
@@ -46,6 +48,7 @@ def main():
             results = TestRunner(suites, 'all', 2).run_tests()
             cases = [dict(name=r.test.fullname, success=r.test.success, failure=str(r.failure) if r.failure else None,
                 artifacts=getattr(r.test, 'output_directory', None)) for r in results]
+            require_cases(cases,'toolchain')
             unique = [case['artifacts'] for case in cases]
             assert len(unique) == len(set(unique)) and all(unique), 'Test outputs are not isolated'
             failures = [case for case in cases if not case['success'] or case['failure']]

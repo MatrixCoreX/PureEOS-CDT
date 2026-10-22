@@ -7,18 +7,20 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from hardening_paths import negative_baseline
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--baseline',type=Path,help='Explicit separate unmodified checkout for negative control')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     report = dict(status='running', scope='Native SDK serialization/allocator and toolchain tester; not WASM or full node',
                   source=str(root), started_utc=datetime.now(timezone.utc).isoformat(), jobs=[])
-    sources = [*sorted((root / 'tests/hardening').glob('*.*')),
+    sources = [*sorted(p for p in (root / 'tests/hardening').glob('*.*') if p.is_file()),
                root / 'libraries/eosiolib/simple_memory.hpp', root / 'libraries/eosiolib/simple_malloc.cpp',
                root / 'libraries/eosiolib/core/eosio/varint.hpp', root / 'libraries/eosiolib/core/eosio/datastream.hpp',
                root / 'tools/toolchain-tester/tests.py', root / 'tools/toolchain-tester/testsuite.py',
@@ -43,7 +45,7 @@ def main():
 
     try:
         if not run('toolchain-results', [sys.executable, '-m', 'unittest', 'discover', '-s',
-                                       'tests/hardening', '-p', 'test_toolchain_results.py', '-v']):
+                                       'tests/hardening', '-p', 'test_*.py', '-v']):
             raise RuntimeError('Toolchain result regression failed')
         compiler = subprocess.check_output(['g++', '--version'], text=True).splitlines()[0]
         report['compiler'] = compiler
@@ -51,9 +53,11 @@ def main():
                     '-I' + str(root / 'libraries/meta_refl/include')]
         # Original checkout stays untouched: this negative control must reject
         # the new expectations, not get silently relabeled as passing.
-        baseline = root.parent / 'cdt'
+        baseline = negative_baseline(root,args.baseline)
+        report['negative_control_baseline']=str(baseline) if baseline else None
+        report['negative_control']='requested' if baseline else 'not-requested-not-a-negative-control-pass'
         baseline_program = output / 'serialization-original.elf'
-        if baseline.is_dir():
+        if baseline is not None:
             old_includes = ['-I' + str(baseline / 'libraries/eosiolib/core'),
                             '-I' + str(baseline / 'libraries/meta_refl/include')]
             if not run('compile-original-control', ['g++', '-std=c++17', '-O2', '-Wno-attributes',
@@ -61,6 +65,7 @@ def main():
                 raise RuntimeError('Original source negative control did not compile')
             if not run('original-control-expected-failure', [baseline_program], allowed=(1,)):
                 raise RuntimeError('Original serialization unexpectedly met hardened expectations')
+            report['negative_control']='passed-original-rejected-hardened-expectations'
         for mode, flags in [('normal', ['-O2']), ('asan-ubsan', ['-O1', '-g', '-fno-omit-frame-pointer',
                                                                 '-fsanitize=address,undefined', '-fno-sanitize-recover=all'])]:
             for case in ('serialization', 'allocator'):

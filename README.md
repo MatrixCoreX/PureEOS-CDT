@@ -1,181 +1,40 @@
-# CDT (Contract Development Toolkit)
+# PureEOS CDT
 
-Contract Development Toolkit (CDT) is a C/C++ toolchain targeting WebAssembly (WASM) and a set of tools to facilitate development of smart contracts written in C/C++ that are meant to be deployed to an [EOS](https://github.com/PureEOSIO/) blockchain.
+PureEOS 智能合约开发工具链与 SDK。当前 `develop` 分支是**未发布的开发候选**，
+不要作为稳定生产版本使用，也不要将开发分支推送当作正式发行。
 
-In addition to being a general purpose WebAssembly toolchain, specific features and optimizations are available to support building EOS-based smart contracts. This new toolchain is built around [Clang 9](https://github.com/PureEOSIO/cdt-llvm), which means that CDT inherits the optimizations and analyses from that version of LLVM, but as the WASM target is still considered experimental, some optimizations are incomplete or not available.
+CDT 稳定版计划与 [PureEOS 并行第一版](https://github.com/MatrixCoreX/PureEOS)
+共同验收、同时发布。当前没有正式标签或二进制发行包；请勿根据旧文档安装
+旧版本，并把它误认为本仓库已经验证的新版本。
 
-## Repo organization
+本轮修复及发布门槛见 [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)。目前采用
+固定上游编译器，对 SDK 头文件及运行库进行加固和重编；不声称完成了 LLVM
+主版本迁移或全编译器现代化，也不把修改后的 SDK 冒充官方未修改安装包。
 
-The `main` branch is the development branch: do not use this for production. Refer to the [release page](https://github.com/PureEOSIO/cdt/releases) for current information on releases, pre-releases, and obsolete releases as well as the corresponding tags for those releases.
-## Binary packages
+## 开发回归
 
-CDT currently supports Linux x86_64 Debian packages. Visit the [release page](https://github.com/PureEOSIO/cdt/releases) to download the package for the appropriate version of CDT. This is the fastest way to get started with the software.
-### Debian package install
-
-Download the appropriate version of the Debian package and then install it. To download and install the latest version, run the following:
-
-```sh
-wget https://github.com/PureEOSIO/cdt/releases/download/v4.1.0/cdt_4.1.0_amd64.deb
-sudo apt install ./cdt_4.1.0_amd64.deb
-```
-### Debian package uninstall
-
-To remove CDT that was installed using a Debian package, simply execute the following command:
+从仓库根目录运行，所有输出使用新的独立目录，不覆盖既有结果：
 
 ```sh
-sudo apt remove cdt
+python3 -m unittest discover -s tests/hardening -p 'test_*.py' -v
+python3 tests/hardening/run_native_tests.py --output /path/to/new-native-results
+python3 tests/hardening/run_toolchain_suite.py --sdk /path/to/sdk --output /path/to/new-toolchain-results
+python3 tests/hardening/run_sdk_native_units.py --sdk /path/to/sdk --output /path/to/new-sdk-unit-results
 ```
 
-## Building from source
-
-Recent Ubuntu LTS releases are the only Linux distributions that we fully support. Other Linux distros and other POSIX operating systems (such as macOS) are tended to on a best-effort basis and may not be full featured.
-
-The instructions below assume that you are building on Ubuntu 20.04.
-
-### Install dependencies
+原版失败对照必须显式指定独立、未修改的上游源码目录，不能用本仓库自身作为对照：
 
 ```sh
-apt-get update && apt-get install   \
-        build-essential             \
-        clang                       \
-        clang-tidy                  \
-        cmake                       \
-        git                         \
-        libxml2-dev                 \
-        opam ocaml-interp           \
-        python3                     \
-        python3-pip                 \
-        time
+python3 tests/hardening/run_native_tests.py --baseline /path/to/unmodified-cdt --output /path/to/new-comparison-results
 ```
 
-```sh
-python3 -m pip install pygments
-```
+原生检查不能替代真实 WASM/节点验收。`run_wasm_checks.py`、
+`build_system_contracts.py`、`run_system_check.py` 需要显式提供对应节点源码、
+程序、SDK 或系统合约目录；各自 `--help` 列出参数。正式验收须绑定相同最终候选
+的源码、工具链、程序与合约摘要，并保留失败记录。
 
-### Allowing integration tests to build
+## 来源与许可
 
-Integration tests require access to a build of [Helios](https://github.com/PureEOSIO/helios), a C++ implementation of the EOS protocol. Simply installing Helios from a binary package will not be sufficient.
-
-If you do not wish to build Helios, you can continue with building CDT but without building the integration tests. Otherwise, follow the instructions below before running `cmake`.
-
-First, ensure that Helios has been built from source (see Helios's [README](https://github.com/PureEOSIO/helios#building-from-source) for details) and identify the build path, e.g. `/path/to/helios/build/`.
-
-Then, execute the following command in the same terminal session that you will use to build CDT:
-
-```sh
-export helios_DIR=/path/to/helios/build/lib/cmake/helios
-```
-
-Now you can continue with the steps to build CDT as described. When you run `cmake` make sure that it does not report `helios package not found`. If it does, this means CDT was not able to find a build of Helios at the specified path in `helios_DIR` and will therefore continue without building the integration tests.
-
-### ccache
-
-If issues persist with ccache when building CDT, you can disable ccache:
-
-```sh
-export CCACHE_DISABLE=1
-```
-
-### Build CDT
-
-**A Warning On Parallel Compilation Jobs (`-j` flag)**: When building C/C++ software often the build is performed in parallel via a command such as `make -j $(nproc)` which uses the number of CPU cores as the number of compilation jobs to perform simultaneously. However, be aware that some compilation units (.cpp files) in CDT are extremely complex and can consume a large amount of memory to compile. If you are running into issues due to amount of memory available on your build host, you may need to reduce the level of parallelization used for the build. For example, instead of `make -j $(nproc)` you can try `make -j2`. Failures due to memory exhaustion will typically but not always manifest as compiler crashes.
-
-```sh
-git clone --recursive https://github.com/PureEOSIO/cdt
-cd cdt
-mkdir build
-cd build
-cmake ..
-make -j $(nproc)
-```
-
-The binaries will be located at in the `build/bin` directory. You can export the path to the directory to your `PATH` environment variable which allows you to conveniently use them to compile contracts without installing CDT globally. Alternatively, you can use CMake toolchain file located in `build/lib/cmake/CDTWasmToolchain.cmake` to compile the contracts in your CMake project, which also allows you to avoid installing CDT globally.
-
-If you would prefer to install CDT globally, see the section [Install CDT](#install-cdt) below.
-
-#### Build CDT in debug mode
-
-To build CDT in debug mode (with debug symbols) you need to add the following flags to cmake command:
-```sh
-cmake -DCMAKE_BUILD_TYPE="Debug" -DTOOLS_BUILD_TYPE="Debug" -DLIBS_BUILD_TYPE="Debug" ..
-```
-
-### Run tests
-
-#### Run unit tests
-
-```sh
-cd build
-
-ctest
-```
-
-#### Run integration tests (if built)
-
-```sh
-cd build/tests/integration
-
-ctest
-```
-
-### Install CDT
-
-Installing CDT globally on your system will install the following tools in a location accessible to your `PATH`:
-
-* cdt-abidiff
-* cdt-ar
-* cdt-cc
-* cdt-cpp
-* cdt-init
-* cdt-ld
-* cdt-nm
-* cdt-objcopy
-* cdt-objdump
-* cdt-ranlib
-* cdt-readelf
-* cdt-strip
-* eosio-pp
-* eosio-wasm2wast
-* eosio-wast2wasm
-
-It will also install CMake files for CDT accessible within a `cmake/cdt` directory located within your system's `lib` directory.
-#### Manual installation
-
-One option for installing CDT globally is via `make install`. From within the `build` directory, run the following command:
-
-```
-sudo make install
-```
-
-#### Package installation
-
-A better option for installing CDT globally is to generate a package and then install the package. This makes uninstalling CDT much easier.
-
-From within the `build` directory, run the following commands to generate a Debian package:
-
-```sh
-cd packages
-bash ./generate_package.sh deb ubuntu-20.04 amd64
-sudo apt install ./cdt_*_amd64.deb
-```
-
-### Uninstall CDT
-
-#### Uninstall CDT after manual installation with make
-
-```sh
-sudo rm -fr /usr/local/cdt
-sudo rm -fr /usr/local/lib/cmake/cdt
-sudo rm /usr/local/bin/eosio-*
-sudo rm /usr/local/bin/cdt-*
-```
-
-#### Uninstall CDT that was installed using a Debian package
-
-```sh
-sudo apt remove cdt
-```
-
-## License
-
-[MIT](./LICENSE)
+保留继承的 CDT/第三方源码和版权声明，许可见 [LICENSE](LICENSE) 及各组件目录。
+[继承的历史 README](docs/INHERITED_README.md) 仅作来源参考，不是本仓库的当前
+发行、安装或平台支持承诺。

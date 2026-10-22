@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import traceback
+from hardening_paths import require_cases, resolve_arguments
 
 
 def main():
@@ -13,6 +14,7 @@ def main():
     parser.add_argument('--sdk', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    resolve_arguments(args,'sdk','output')
     root = Path(__file__).resolve().parents[2]
     args.output.mkdir(exist_ok=False)
     cases = sorted((root / 'tests/unit').glob('*.cpp'))
@@ -30,6 +32,7 @@ def main():
         print(name + ': exit=' + str(result.returncode), flush=True)
         if result.returncode: raise RuntimeError(name + ' failed; remaining units not claimed')
     try:
+        require_cases(cases,'native SDK unit')
         for source in cases:
             program = args.output / (source.stem + '.elf')
             run('compile-' + source.stem, [args.sdk / 'bin/cdt-cpp', '-fnative', '-O2', source, '-o', program])

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import traceback
+from hardening_paths import resolve_arguments
 
 
 def sha(path):
@@ -17,6 +18,7 @@ def main():
     parser.add_argument('--sdk', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    resolve_arguments(args,'sdk','output')
     args.output.mkdir(exist_ok=False)
     source = Path(__file__).with_name('multi_index_cache_profile.cpp')
     header = args.sdk / 'include/eosiolib/contracts/eosio/multi_index.hpp'
