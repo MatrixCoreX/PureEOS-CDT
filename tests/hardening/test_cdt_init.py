@@ -13,7 +13,7 @@ class CDTInitTests(unittest.TestCase):
         source = Path(__file__).resolve().parents[2]/'tools/init/cdt-init.cpp'
         try:
             subprocess.run(['c++', '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
-                '-DPUREEOS_CDT_INIT_VERSION="test-candidate"', str(source), '-o', str(cls.program)],
+                '-DAIC_CDT_INIT_VERSION="test-candidate"', str(source), '-o', str(cls.program)],
                 capture_output=True, text=True, check=True, timeout=120)
         except BaseException:
             cls.area.cleanup(); raise
@@ -29,6 +29,7 @@ class CDTInitTests(unittest.TestCase):
         self.assertEqual(self.invoke('--help').returncode, 0)
         result = self.invoke('--version'); self.assertEqual(result.returncode, 0)
         self.assertIn('test-candidate', result.stdout)
+        self.assertEqual(result.stdout.strip(), 'AIC CDT test-candidate (cdt-init)')
 
     def test_normal_scaffold_has_both_cmake_minima_and_pinned_child_sdk(self):
         with tempfile.TemporaryDirectory(dir=self.root) as parent:

@@ -1,0 +1,20 @@
+{
+  "status": "archived-before-ci-repair",
+  "files": {
+    "build.yaml": {
+      "archive": "build.yaml.txt",
+      "sha256": "396aa970a585b720414cbfa8771ff3c3f44bcdc9228407e67f9e3c3d649a1d4d"
+    },
+    "release.yaml": {
+      "archive": "release.yaml.txt",
+      "sha256": "27b859b2281d54d10c3cee9ffd99eb367eea0a9f1a8f3f824c467838511c68a0"
+    },
+    "label_new_issues.yaml": {
+      "archive": "label_new_issues.yaml.txt",
+      "sha256": "7e7c178a668a74422d98c8eaa2d8dbeaa5432f48e9bc45a0a9198a20f302ce0d"
+    }
+  },
+  "created_utc": "2026-10-23T16:35:02.334864+00:00",
+  "scope": "Three prior CDT workflows, including sparse-hidden issue automation; original bytes retained, no external automation executed.",
+  "sparse_followup_utc": "2026-10-23T18:17:20.085706+00:00"
+}

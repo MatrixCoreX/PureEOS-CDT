@@ -1,0 +1,112 @@
+name: "Build & Test"
+
+on:
+  push:
+    branches:
+      - main
+      - "release/*"
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      override-pureeos-helios-dev:
+        description: Override pureeos-helios-dev target
+        type: string
+      override-pureeos-helios-dev-prerelease:
+        type: choice
+        description: Override pureeos-helios-dev prelease
+        options:
+        - default
+        - true
+        - false
+
+permissions:
+  packages: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  platform-cache:
+    name: Platform Cache
+    uses: PureEOSIO/platform-cache-workflow/.github/workflows/platformcache.yaml@v1
+    permissions:
+      packages: write
+      contents: read
+    with:
+      runs-on: '["self-hosted", "enf-x86-beefy"]'
+      platform-files: .cicd/platforms
+
+  versions:
+    name: Determine Versions
+    runs-on: ubuntu-latest
+    outputs:
+      pureeos-helios-dev-target: ${{steps.versions.outputs.pureeos-helios-dev-target}}
+      pureeos-helios-dev-prerelease: ${{steps.versions.outputs.pureeos-helios-dev-prerelease}}
+    steps:
+      - name: Setup versions from input or defaults
+        id: versions
+        env:
+          GH_TOKEN: ${{github.token}}
+        run: |
+          DEFAULTS_JSON=$(curl -sSfL $(gh api https://api.github.com/repos/${{github.repository}}/contents/.cicd/defaults.json?ref=${{github.sha}} --jq .download_url))
+          echo pureeos-helios-dev-target=$(echo "$DEFAULTS_JSON" | jq -r '."pureeos-helios-dev".target') >> $GITHUB_OUTPUT
+          echo pureeos-helios-dev-prerelease=$(echo "$DEFAULTS_JSON" | jq -r '."pureeos-helios-dev".prerelease') >> $GITHUB_OUTPUT
+
+          if [[ "${{inputs.override-pureeos-helios-dev}}" != "" ]]; then
+            echo pureeos-helios-dev-target=${{inputs.override-pureeos-helios-dev}} >> $GITHUB_OUTPUT
+          fi
+          if [[ "${{inputs.override-pureeos-helios-dev-prerelease}}" == +(true|false) ]]; then
+            echo pureeos-helios-dev-prerelease=${{inputs.override-pureeos-helios-dev-prerelease}} >> $GITHUB_OUTPUT
+          fi
+
+  Build:
+    name: Build & Test
+    needs: [platform-cache, versions]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu20, ubuntu22, ubuntu22-llvm, ubuntu24]
+    runs-on: ["self-hosted", "enf-x86-beefy"]
+    container: ${{fromJSON(needs.platform-cache.outputs.platforms)[matrix.platform].image}}
+    steps:
+        - uses: actions/checkout@v4
+          with:
+            submodules: recursive
+        - name: Download pureeos-helios-dev.deb (Ubuntu 22 only)
+          if: matrix.platform == 'ubuntu22'
+          uses: PureEOSIO/asset-artifact-download-action@v3
+          with:
+            owner: PureEOSIO
+            repo: helios
+            file: 'pureeos-helios-dev.*ubuntu22\.04_amd64.deb'
+            target: '${{needs.versions.outputs.pureeos-helios-dev-target}}'
+            prereleases: ${{fromJSON(needs.versions.outputs.pureeos-helios-dev-prerelease)}}
+            artifact-name: pureeos-helios-dev-ubuntu22-amd64
+            container-package: pureeos-helios-experimental-binaries
+        - name: Install pureeos-helios-dev.deb (Ubuntu 22 only)
+          if: matrix.platform == 'ubuntu22'
+          run: |
+            apt-get update && apt-get upgrade -y
+            apt install -y ./pureeos-helios-dev*.deb
+            rm ./pureeos-helios-dev*.deb
+        - name: Build & Test
+          run: |
+            mkdir build
+            cd build
+            cmake -DCMAKE_BUILD_TYPE=Release ..
+            make -j $(nproc)
+            cd tests
+            ctest -j $(nproc) --output-on-failure
+        - name: Package (Ubuntu 20 only)
+          if: matrix.platform == 'ubuntu20'
+          run: |
+            cd build/packages
+            bash generate_package.sh deb ubuntu amd64
+        - name: Upload (Ubuntu 20 only)
+          if: matrix.platform == 'ubuntu20'
+          uses: actions/upload-artifact@v4
+          with:
+            name: aic_cdt_ubuntu_package_amd64
+            path: build/packages/aic-cdt*amd64.deb

@@ -13,15 +13,15 @@ jobs:
       packages: write
       actions: read
     steps:
-      - name: Get cdt.deb
+      - name: Get AIC CDT package
         id: getter
         uses: PureEOSIO/asset-artifact-download-action@v3
         with:
           owner: ${{github.repository_owner}}
           repo: ${{github.event.repository.name}}
-          file: cdt_.*_amd64.deb 
+          file: aic-cdt_.*_amd64.deb
           target: ${{github.sha}}
-          artifact-name: cdt_ubuntu_package_amd64
+          artifact-name: aic_cdt_ubuntu_package_amd64
           wait-for-exact-target: true
       - run: |
           curl -LsSf \

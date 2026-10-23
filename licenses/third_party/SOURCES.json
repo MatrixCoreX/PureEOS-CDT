@@ -1,0 +1,46 @@
+{
+  "components": {
+    "libcxx": {
+      "bytes": 16703,
+      "commit": "dd2d7b0ffea485690e75f4381432be243bf1fb3a",
+      "git_blob_sha": "e159d283443f92ac78b964d2bccebe8f95d5d445",
+      "id": "libcxx",
+      "install_path": "licenses/libcxx.license",
+      "module_path": "libraries/libc++/cdt-libcxx",
+      "path": "LICENSE.TXT",
+      "repository": "AntelopeIO/cdt-libcxx",
+      "sha256": "539dd7aed86e8a4f12cbdd0e6c50c189c7d74847e4fecc64ce2c6ee3a01da38b",
+      "source_path": "licenses/third_party/libcxx.LICENSE.TXT",
+      "source_url": "https://github.com/AntelopeIO/cdt-libcxx/blob/dd2d7b0ffea485690e75f4381432be243bf1fb3a/LICENSE.TXT"
+    },
+    "musl": {
+      "bytes": 5927,
+      "commit": "9e6b206efcf203e875f2a659067a295f22cc83a9",
+      "git_blob_sha": "f0ee3b78d87987bf951fe1ae136505fe2d0f4013",
+      "id": "musl",
+      "install_path": "licenses/musl.license",
+      "module_path": "libraries/libc/cdt-musl",
+      "path": "COPYRIGHT",
+      "repository": "AntelopeIO/cdt-musl",
+      "sha256": "70ca142d257e2690a1f8eda8a296e64a6d1b16d8aee6784f8ddcf67f3163635d",
+      "source_path": "licenses/third_party/musl.COPYRIGHT",
+      "source_url": "https://github.com/AntelopeIO/cdt-musl/blob/9e6b206efcf203e875f2a659067a295f22cc83a9/COPYRIGHT"
+    },
+    "softfloat": {
+      "bytes": 1738,
+      "commit": "203b6df7dedc5bae1b2a7b1b23562335a6344578",
+      "git_blob_sha": "b5690face082dc71bc7a8c612db03daad9605696",
+      "id": "softfloat",
+      "install_path": "licenses/softfloat.license",
+      "module_path": "libraries/native/softfloat",
+      "path": "COPYING.txt",
+      "repository": "AntelopeIO/berkeley-softfloat-3",
+      "sha256": "145ea96b4a4a04a1a7738d2a2bf9e830f861971e69606187b018d9e8fc0b95c7",
+      "source_path": "licenses/third_party/softfloat.COPYING.txt",
+      "source_url": "https://github.com/AntelopeIO/berkeley-softfloat-3/blob/203b6df7dedc5bae1b2a7b1b23562335a6344578/COPYING.txt"
+    }
+  },
+  "project_source_commit": "714543c5a001ac4a9f5b2baa4b55fb5064dadd62",
+  "schema": 1,
+  "scope": "Notices from the fixed project dependency sources, preserved separately from original project/AIC licenses; no blanket license-clearance claim."
+}

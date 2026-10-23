@@ -16,7 +16,7 @@ using namespace llvm;
 int main(int argc, const char **argv) {
 
   cl::SetVersionPrinter([](llvm::raw_ostream& os) {
-        os << "cdt-ld version " << "${VERSION_FULL}" << "\n";
+        os << "AIC CDT ${VERSION_FULL} (cdt-ld)\n";
   });
   cl::ParseCommandLineOptions(argc, argv, "cdt-ld (WebAssembly linker)");
   Options opts = CreateOptions();

@@ -8,8 +8,8 @@
 #include <stdexcept>
 #include <string>
 
-#ifndef PUREEOS_CDT_INIT_VERSION
-#define PUREEOS_CDT_INIT_VERSION "@VERSION_FULL@"
+#ifndef AIC_CDT_INIT_VERSION
+#define AIC_CDT_INIT_VERSION "@VERSION_FULL@"
 #endif
 
 namespace fs = std::filesystem;
@@ -182,7 +182,7 @@ int main(int argc, const char **argv) {
             return 0;
          }
          if (arg == "--version") {
-            std::cout << "cdt-init version " << PUREEOS_CDT_INIT_VERSION << "\n";
+            std::cout << "AIC CDT " << AIC_CDT_INIT_VERSION << " (cdt-init)\n";
             return 0;
          }
          if (arg == "--bare") { bare_opt = true; continue; }

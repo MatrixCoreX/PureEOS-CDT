@@ -1,0 +1,7 @@
+{
+  "product": "AIC CDT",
+  "upstream_project": "Antelope CDT",
+  "upstream_version": "5.0.0-dev1.1",
+  "llvm_repository": "https://github.com/AntelopeIO/cdt-llvm",
+  "llvm_commit": "34c0de54049689382e3ca28f9defe21d31ed538b"
+}

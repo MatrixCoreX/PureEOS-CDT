@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+from contract_artifacts import split_contract_artifacts
 
 
 def contract_source(path):
@@ -62,7 +63,8 @@ def main():
         for required in ('eosio.system/eosio.system.wasm', 'eosio.token/eosio.token.wasm',
                          'eosio.bpay/eosio.bpay.wasm', 'eosio.system/.powerup/powup.results.wasm'):
             assert (build / required).is_file(), required
-        report['artifacts_sha256'] = {str(p.relative_to(build)): sha(p) for p in artifacts}
+        inventory = {str(p.relative_to(build)): sha(p) for p in artifacts}
+        report['artifacts_sha256'], report['build_probe_artifacts_sha256'] = split_contract_artifacts(inventory)
         assert hashes() == report['inputs_sha256'], 'Frozen inputs changed'
         report['status'] = 'passed'
     except Exception as error:
