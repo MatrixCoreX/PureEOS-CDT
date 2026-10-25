@@ -1,14 +1,12 @@
 # AIC CDT
 
-AIC 独立项目的智能合约开发工具链与 SDK，当前发行目标版本为 **1.0.0**。
+AIC 独立项目的智能合约开发工具链与 SDK，本发行版本为 **1.0.0**。
 本项目独立维护、独立制定技术路线。自有发行版本见 [VERSION](VERSION)，
 依赖基线见 [UPSTREAM_BASELINE.json](UPSTREAM_BASELINE.json)。
-当前开发分支是**未发布的开发候选**，
-不要作为稳定生产版本使用，也不要将开发分支推送当作正式发行。
-
-CDT 稳定版计划与 [PureEOS 并行第一版](https://github.com/MatrixCoreX/PureEOS)
-共同验收、同时发布。当前没有正式标签或二进制发行包；请勿根据旧文档安装
-旧版本，并把它误认为本仓库已经验证的新版本。
+本标签与 PureEOS 2.0.0 并行首版配套验收，SDK和完整项目源码在
+[联合发行页](https://github.com/MatrixCoreX/PureEOS/releases/tag/v2.0.0)提供。
+使用该页的来源清单和 SHA256SUMS 核对工具链、SDK运行库和匹配合约；
+开发分支与历史候选包仍保留各自身份，不替代本发行。
 
 本轮修复及发布门槛见 [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)。目前采用
 固定上游后端，重新构建AIC工具前端，并对 SDK 头文件及运行库进行加固和重编；不声称完成了 LLVM
@@ -42,8 +40,9 @@ python3 tests/hardening/run_native_tests.py --baseline /path/to/unmodified-cdt -
 它将测试 SDK 的绝对链接转成独立文件，保留完整工具、脚本和第三方许可证，
 并按 CMake 文件自身位置定位 SDK。打包必须经过实际搬迁后的 CMake、工具链、
 原生 SDK 和真实合约编译对照；测试目录不能直接冒充可安装发行包。
-此入口仍需最终节点联合验收，不生成稳定标签。新发行程序应显示
-`AIC CDT 1.0.0`；旧测试工具及报告保留原版本身份，前端重建/重测通过后再交付。
+该开发入口不生成稳定标签。本版的稳定包在最终节点联合验收通过后独立生成，
+只更新来源记录和发行说明，编译器、库及头文件保持已验收字节。
+发行工具显示`AIC CDT 1.0.0`，旧工具及报告保留原版本身份。
 项目生成器 `cdt-init --project=NAME --path=/已存在的父目录` 只创建新项目，
 拒绝覆盖已有目录。新项目支持现代 CMake，通过 `CMAKE_PREFIX_PATH` 选择 SDK。
 打包还验证解压安装后的生成/构建、原文件保护和确定性归档，不把测试 staging
