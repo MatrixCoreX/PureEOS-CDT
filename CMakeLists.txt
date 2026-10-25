@@ -11,12 +11,8 @@ This process created the file `CMakeCache.txt' and the directory `CMakeFiles'.
 Please delete them.")
 endif()
 
-project(cdt)
-
-set(VERSION_MAJOR 5)
-set(VERSION_MINOR 0)
-set(VERSION_PATCH 0)
-set(VERSION_SUFFIX "dev1")
+include(modules/AICCDTVersion.cmake)
+project(AICCDT VERSION "${AIC_CDT_VERSION}")
 
 if (VERSION_SUFFIX)
    set(VERSION_FULL "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}-${VERSION_SUFFIX}")
@@ -24,7 +20,7 @@ else()
    set(VERSION_FULL "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 endif()
 
-set(CDT_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX}/cdt)
+set(CDT_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX}/aic-cdt)
 
 option(ENABLE_NATIVE_COMPILER "enable native builds with the CDT toolchain" ON)
 option(ENABLE_TESTS "enable building tests" ON)
@@ -77,10 +73,10 @@ configure_file(${CMAKE_SOURCE_DIR}/scripts/ricardeos/ricardeos.py ${CMAKE_BINARY
 install(FILES ${CMAKE_BINARY_DIR}/scripts/ricardeos.py DESTINATION ${CDT_INSTALL_PREFIX}/scripts)
 
 # section for package construction
-set(VENDOR "PureEOSIO")
-set(PROJECT_NAME "cdt")
-set(DESC "Toolchain and supporting tools to facilitate C/C++ development of contracts for EOS blockchains")
-set(URL "https://github.com/PureEOSIO/cdt")
+set(VENDOR "AIC")
+set(PROJECT_NAME "aic-cdt")
+set(DESC "AIC CDT smart contract C/C++ toolchain and SDK")
+set(URL "https://github.com/MatrixCoreX/PureEOS-CDT")
 set(EMAIL "support@pureeos.io")
 configure_file(${CMAKE_SOURCE_DIR}/scripts/generate_package.sh.in ${CMAKE_BINARY_DIR}/packages/generate_package.sh @ONLY)
 configure_file(${CMAKE_SOURCE_DIR}/scripts/generate_deb.sh ${CMAKE_BINARY_DIR}/packages/generate_deb.sh COPYONLY)

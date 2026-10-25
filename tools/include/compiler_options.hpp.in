@@ -405,6 +405,10 @@ static void GetCompDefaults(std::vector<std::string>& copts) {
    copts.emplace_back(std::string("-D__eosio_cdt_major__=")+"${VERSION_MAJOR}");
    copts.emplace_back(std::string("-D__eosio_cdt_minor__=")+"${VERSION_MINOR}");
    copts.emplace_back(std::string("-D__eosio_cdt_patchlevel__=")+"${VERSION_PATCH}");
+   copts.emplace_back("-D__aic_cdt__=1");
+   copts.emplace_back(std::string("-D__aic_cdt_major__=")+"${VERSION_MAJOR}");
+   copts.emplace_back(std::string("-D__aic_cdt_minor__=")+"${VERSION_MINOR}");
+   copts.emplace_back(std::string("-D__aic_cdt_patchlevel__=")+"${VERSION_PATCH}");
    if (!fnative_opt) {
       copts.emplace_back("--target=wasm32");
       copts.emplace_back("-ffreestanding");

@@ -2,9 +2,11 @@
 import gzip
 from pathlib import Path
 import tarfile
+from aic_identity import identity
 
 
 def archive_sdk(sdk, archive, epoch):
+    package_directory = identity()['package_directory']
     sdk, archive = Path(sdk).resolve(strict=True), Path(archive).resolve()
     if archive.is_relative_to(sdk): raise ValueError('Archive must not be inside the SDK')
     if not isinstance(epoch, int) or not 0 <= epoch <= 0xffffffff: raise ValueError('Invalid archive epoch')
@@ -17,7 +19,7 @@ def archive_sdk(sdk, archive, epoch):
     with archive.open('xb') as raw, gzip.GzipFile(filename='', mode='wb', fileobj=raw,
             compresslevel=1, mtime=epoch) as compressed, tarfile.open(fileobj=compressed,
             mode='w', format=tarfile.PAX_FORMAT) as stream:
-        stream.add(sdk, arcname='pureeos-cdt-candidate', recursive=False, filter=public)
+        stream.add(sdk, arcname=package_directory, recursive=False, filter=public)
         for path in sorted(sdk.rglob('*')):
             if path.is_symlink(): raise ValueError('Materialize SDK links before archiving')
-            stream.add(path, arcname='pureeos-cdt-candidate/'+str(path.relative_to(sdk)), recursive=False, filter=public)
+            stream.add(path, arcname=package_directory+'/'+str(path.relative_to(sdk)), recursive=False, filter=public)

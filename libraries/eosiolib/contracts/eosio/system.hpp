@@ -7,16 +7,16 @@
 #include "../../core/eosio/check.hpp"
 #include "../../core/eosio/fixed_bytes.hpp"
 #include "../../core/eosio/name.hpp"
+#include "../../capi/eosio/types.h"
 
 namespace eosio {
   namespace internal_use_do_not_use {
+    // The C and C++ declarations have C linkage and must name the SAME type,
+    // including when native tester.hpp has already included the C API.
+    using capi_checksum256 = ::capi_checksum256;
     extern "C" {
       __attribute__((eosio_wasm_import, noreturn))
       void eosio_exit( int32_t code );
-
-      struct  __attribute__((aligned (16))) capi_checksum256 {
-         uint8_t hash[32];
-      };
 
       __attribute__((eosio_wasm_import))
       bool is_feature_activated( const capi_checksum256* feature_digest );

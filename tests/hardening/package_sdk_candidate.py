@@ -12,6 +12,11 @@ import subprocess
 import tarfile
 import traceback
 from sdk_archive import archive_sdk
+from aic_identity import identity
+from source_revision import source_revision
+from sdk_notices import collect_notices, install_notices
+from rebuild_runtime_library import rebuild_runtime
+from check_runtime_parameters import check_parameters
 
 
 def sha(path):
@@ -46,22 +51,55 @@ def materialize(source, destination, allowed_roots, *, overlay=False):
     return files
 
 
+def distribution_metadata(source, sdk, output, files):
+    """Preserve historical package evidence outside the new SDK; retain licenses."""
+    source, sdk, output = map(Path, (source, sdk, output))
+    collect_notices(source)  # Reject missing/changed declarations before moving old metadata.
+    historical = {}
+    for name in ('PUREEOS_SDK_PROVENANCE.json', 'AIC_CDT_PROVENANCE.json'):
+        old = sdk/name
+        if old.exists():
+            evidence = output/'historical-provenance'; evidence.mkdir(exist_ok=True)
+            target = evidence/name
+            if target.exists(): raise FileExistsError('Historical package evidence already exists')
+            digest = sha(old)
+            old.rename(target); files.pop(name, None)
+            historical[name] = dict(sha256=digest, saved_as=str(target))
+    for name in ('LICENSE', 'AIC_LICENSE.md', 'LICENSING.md', 'VERSION', 'UPSTREAM_BASELINE.json'):
+        original = source/name; target = sdk/name
+        shutil.copyfile(original, target)
+        files[name] = dict(source=str(original), sha256=sha(original))
+        if sha(target) != files[name]['sha256']: raise RuntimeError('Distribution metadata changed during copy')
+    files.update(install_notices(source, sdk))
+    return historical
+
+
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('sdk', 'base-sdk', 'wasm-evidence', 'node-source', 'output'):
         parser.add_argument('--'+name, type=Path, required=True)
+    parser.add_argument('--frontend-evidence', type=Path, required=True)
+    parser.add_argument('--runtime-parameter-tester', type=Path, required=True,
+        help='Real node cdt_runtime_parameter_test executable; validates SDK get/set in both WASM engines')
+    parser.add_argument('--source-metadata', type=Path,
+        help='Complete externally stored frozen-source manifest, for source archive packaging without git')
+    parser.add_argument('--original-sdk', type=Path, required=True,
+        help='Unmodified upstream SDK for historical failure controls; separate from the complete base SDK')
     args = parser.parse_args()
-    for name in ('sdk', 'base_sdk', 'wasm_evidence', 'node_source'):
+    for name in ('sdk', 'base_sdk', 'original_sdk', 'wasm_evidence', 'node_source', 'frontend_evidence', 'runtime_parameter_tester'):
         setattr(args, name, getattr(args, name).resolve(strict=True))
     args.output = args.output.resolve()
     root = Path(__file__).resolve().parents[2]
-    if any(args.output == p or args.output.is_relative_to(p) for p in (args.sdk, args.base_sdk, root)):
+    revision = source_revision(root, args.source_metadata)
+    aic = identity(root); package_directory = aic['package_directory']
+    if any(args.output == p or args.output.is_relative_to(p) for p in (args.sdk, args.base_sdk, args.original_sdk, root)):
         raise ValueError('Output must be independent of the SDK and source inputs')
     args.output.mkdir(exist_ok=False)
     report = dict(status='running', release_ready=False, scope=__doc__, jobs=[],
-        source_commit=subprocess.check_output(['git', '-C', root, 'rev-parse', 'HEAD'], text=True).strip(),
+        source_commit=revision['source_commit'], source_revision=revision,
         started_utc=datetime.now(timezone.utc).isoformat(), package_script_sha256=sha(__file__))
+    report['distribution_identity'] = aic
     def save():
         pending = args.output/'report.pending'; pending.write_text(json.dumps(report, indent=2))
         pending.replace(args.output/'report.json')
@@ -74,6 +112,10 @@ def main():
         save()
         previous = json.loads(args.wasm_evidence.read_text())
         assert previous['status'] == 'passed'
+        frontend = json.loads(args.frontend_evidence.read_text())
+        assert frontend['status'] == 'passed' and frontend['distribution_identity'] == aic
+        for tool in ('cdt-cc','cdt-cpp','cdt-ld','cdt-abidiff','cdt-init'):
+            assert sha(args.sdk/'bin'/tool) == frontend['tools_sha256']['bin/'+tool], 'Rebuilt AIC frontends required'
         for name in ('simple_malloc.cpp', 'simple_memory.hpp', 'core/eosio/varint.hpp', 'core/eosio/datastream.hpp'):
             suffix = '/libraries/eosiolib/'+name
             old = [d for p, d in previous['inputs_sha256'].items() if p.endswith(suffix)]
@@ -84,23 +126,31 @@ def main():
         for p in (root/'libraries/eosiolib/core').rglob('*'):
             if p.is_file(): assert sha(p) == sha(args.sdk/'include/eosiolib/core'/p.relative_to(root/'libraries/eosiolib/core'))
         payload = args.output/'payload'; payload.mkdir()
-        sdk = payload/'pureeos-cdt-candidate'
+        sdk = payload/package_directory
         # Retain the complete official SDK layout, scripts and third-party
         # licenses, not only the minimal headers/tools used by the test stage.
         files = materialize(args.base_sdk, sdk, (args.base_sdk,))
         files.update(materialize(args.sdk, sdk, (args.sdk, args.base_sdk), overlay=True))
+        report['historical_package_provenance'] = distribution_metadata(root, sdk, args.output, files)
+        report['baseline_runtime_parameters'] = check_parameters(sdk, root,
+            args.runtime_parameter_tester, args.output/'baseline-runtime-parameters', baseline=True)
+        runtime = rebuild_runtime(sdk, root, args.output/'core-runtime-rebuild')
+        report['core_runtime_rebuild'] = runtime
+        for name, row in runtime['libraries'].items():
+            files['lib/'+name] = dict(source=row['source'], sha256=row['sha256'])
+        for name, row in runtime['installed_headers'].items():
+            files[name] = dict(source=row['source'], sha256=row['sha256'])
+        report['rebuilt_runtime_parameters'] = check_parameters(sdk, root,
+            args.runtime_parameter_tester, args.output/'rebuilt-runtime-parameters')
         for name, template in (('cdt-config.cmake', 'cdt-config.cmake'),
                 ('CDTWasmToolchain.cmake', 'CDTWasmToolchain.cmake.in')):
             source = root/'modules'/template
-            text = source.read_text().replace('@VERSION_FULL@', '5.0.0-dev1.1').replace('@SYSROOT_DIR@', '')
+            text = source.read_text().replace('@VERSION_FULL@', aic['version']).replace('@SYSROOT_DIR@', '')
             assert '@CDT_ROOT_DIR@' not in text and '@VERSION_FULL@' not in text
             path = sdk/'lib/cmake/cdt'/name; path.write_text(text)
             files['lib/cmake/cdt/'+name] = dict(source=str(source), source_sha256=sha(source), sha256=sha(path))
-        init_source = root/'tools/init/cdt-init.cpp'
-        run('build-standalone-cdt-init', ['c++', '-std=c++17', '-O2',
-            '-DPUREEOS_CDT_INIT_VERSION="5.0.0-dev1.1+pureeos-dev"', init_source, '-o', sdk/'bin/cdt-init'])
-        files['bin/cdt-init'] = dict(source=str(init_source), source_sha256=sha(init_source), sha256=sha(sdk/'bin/cdt-init'))
-        report['init_compiler'] = subprocess.check_output(['c++', '--version'], text=True).splitlines()[0]
+        report['native_tools_sha256'] = frontend['tools_sha256']
+        assert all(sha(sdk/p) == d for p, d in report['native_tools_sha256'].items())
         report['archive_helper_sha256'] = sha(Path(__file__).with_name('sdk_archive.py'))
         report.update(sdk_files=len(files), sdk_manifest_sha256=None)
         assert files and not any(p.is_symlink() for p in sdk.rglob('*'))
@@ -108,21 +158,22 @@ def main():
         report['sdk_manifest_sha256'] = sha(args.output/'materialized-files.json'); save()
         # Rename the entire prefix before the first invocation. Compiler/SDK
         # checks then run without reintroducing the staging prefix via PATH.
-        relocated = payload/'relocated-pureeos-cdt-candidate'; sdk.rename(relocated); sdk = relocated
+        relocated = payload/('relocated-'+package_directory); sdk.rename(relocated); sdk = relocated
         run('compiler-version', [sdk/'bin/cdt-cpp', '--version'])
+        assert 'AIC CDT '+aic['version'] in (args.output/'compiler-version.log').read_text()
         negative = args.output/'original-cmake-negative.log'
         with negative.open('x') as stream:
             old = subprocess.run(['cmake', '-S', str(root/'tests/hardening/sdk_relocation_fixture'),
                 '-B', str(args.output/'original-cmake-negative'),
-                '-DCMAKE_TOOLCHAIN_FILE='+str(args.sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
-                '-Dcdt_DIR='+str(args.sdk/'lib/cmake/cdt'), '-DPUREEOS_EXPECTED_SDK='+str(args.sdk),
+                '-DCMAKE_TOOLCHAIN_FILE='+str(args.original_sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
+                '-Dcdt_DIR='+str(args.original_sdk/'lib/cmake/cdt'), '-DPUREEOS_EXPECTED_SDK='+str(args.original_sdk),
                 '-DPUREEOS_TEST_CONTRACT='+str(args.node_source/'tests/fixtures/cdt_modern_smoke.cpp')],
                 stdout=stream, stderr=subprocess.STDOUT, timeout=120)
         assert old.returncode > 0 and any(s in negative.read_text() for s in
             ('/usr/bin/cdt-cpp', 'CDT resolved outside', 'CDTMacros')), 'Original failure not reproduced'
         report['original_cmake_negative_control'] = dict(expected_failure=True, exit_code=old.returncode,
-            toolchain_sha256=sha(args.sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
-            config_sha256=sha(args.sdk/'lib/cmake/cdt/cdt-config.cmake'))
+            toolchain_sha256=sha(args.original_sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
+            config_sha256=sha(args.original_sdk/'lib/cmake/cdt/cdt-config.cmake'))
         cmake_build = args.output/'cmake-smoke'
         run('relocated-cmake-configure', ['cmake', '-S', root/'tests/hardening/sdk_relocation_fixture',
             '-B', cmake_build, '-DCMAKE_TOOLCHAIN_FILE='+str(sdk/'lib/cmake/cdt/CDTWasmToolchain.cmake'),
@@ -134,7 +185,7 @@ def main():
         report['cmake_fixture_sha256'] = {p.name: sha(p) for p in
             (cmake_build/'cdtcompat.wasm', cmake_build/'cdtcompat.abi')}
         old_parent = args.output/'original-init-parent'; old_parent.mkdir()
-        run('original-init-generate', [args.base_sdk/'bin/cdt-init', '--project=oldproject', '--path='+str(old_parent)])
+        run('original-init-generate', [args.original_sdk/'bin/cdt-init', '--project=oldproject', '--path='+str(old_parent)])
         run('original-init-configure', ['cmake', '-S', old_parent/'oldproject', '-B', args.output/'original-init-build',
             '-DCMAKE_PREFIX_PATH='+str(sdk)])
         with (args.output/'original-init-build-negative.log').open('x') as stream:
@@ -142,7 +193,7 @@ def main():
                 stdout=stream, stderr=subprocess.STDOUT, timeout=120)
         assert old_init.returncode > 0 and 'No cmake_minimum_required' in (args.output/'original-init-build-negative.log').read_text()
         report['original_init_negative_control'] = dict(expected_failure=True, exit_code=old_init.returncode,
-            original_binary_sha256=sha(args.base_sdk/'bin/cdt-init'))
+            original_binary_sha256=sha(args.original_sdk/'bin/cdt-init'))
         run('relocated-toolchain-three-rounds', ['python3', root/'tests/hardening/run_toolchain_suite.py',
             '--sdk', sdk, '--output', args.output/'toolchain'], 1200)
         detail = json.loads((args.output/'toolchain/report.json').read_text())
@@ -151,7 +202,7 @@ def main():
         run('relocated-sdk-native-units', ['python3', root/'tests/hardening/run_sdk_native_units.py',
             '--sdk', sdk, '--output', args.output/'sdk-units'], 1200)
         detail = json.loads((args.output/'sdk-units/report.json').read_text())
-        assert detail['status'] == 'passed' and len(detail['jobs']) == 72
+        assert detail['status'] == 'passed' and len(detail['jobs']) == 76
         report['fixtures'] = {}
         for name, contract in (('cdtcompat', 'tests/fixtures/cdt_modern_smoke.cpp'),
                 ('complexbench', 'unittests/test-contracts/complex_benchmark/complex_benchmark.cpp')):
@@ -160,17 +211,24 @@ def main():
                 '-I'+str(sdk/'include'), '-contract='+name, args.node_source/contract, '-o', target])
             for artifact in (target, target.with_suffix('.abi')):
                 original = args.wasm_evidence.parent/name/artifact.name
-                assert sha(artifact) == sha(original), 'Relocated SDK changed actual fixture bytes: '+artifact.name
+                # A freshly rebuilt core runtime legitimately changes linked
+                # WASM bytes. The public ABI must stay unchanged; execution is
+                # checked separately, including parameter get/set round trips.
+                if artifact.suffix == '.abi':
+                    assert sha(artifact) == sha(original), 'Runtime rebuild changed fixture ABI: '+artifact.name
                 report['fixtures'][name+'/'+artifact.name] = sha(artifact)
         assert all(sha(sdk/p) == v['sha256'] and sha(v['source']) == v.get('source_sha256', v['sha256']) for p, v in files.items())
         provenance = dict(scope=__doc__, stable_release=False, source_commit=report['source_commit'],
-            upstream_compiler_unchanged=True, full_llvm_rebuild=False,
-            rebuilt_native_tools=['cdt-init'], init_compiler=report['init_compiler'],
+            distribution_identity=aic, upstream_compiler_unchanged=False, full_llvm_rebuild=False,
+            frontend_build_report_sha256=sha(args.frontend_evidence),
+            rebuilt_native_tools=['cdt-cc','cdt-cpp','cdt-ld','cdt-abidiff','cdt-init'],
+            native_tools_sha256=report['native_tools_sha256'],
+            rebuilt_core_runtime=runtime,
             hardened_runtime_sha256=expected_runtime[0], files_sha256={p: v['sha256'] for p, v in files.items()},
             acceptance='Relocated compile/link/ABI/native checks only; joint final node release still required')
-        (sdk/'PUREEOS_SDK_PROVENANCE.json').write_text(json.dumps(provenance, indent=2))
-        archive = args.output/'pureeos-cdt-development-candidate.tar.gz'
-        epoch = int(subprocess.check_output(['git', '-C', root, 'show', '-s', '--format=%ct', report['source_commit']], text=True))
+        (sdk/'AIC_CDT_PROVENANCE.json').write_text(json.dumps(provenance, indent=2))
+        archive = args.output/(package_directory+'-candidate.tar.gz')
+        epoch = revision['source_epoch']
         archive_sdk(sdk, archive, epoch)
         replica = args.output/'reproducibility-check.tar.gz'; archive_sdk(sdk, replica, epoch)
         assert sha(archive) == sha(replica), 'Identical SDK produced different archive bytes'
@@ -181,12 +239,13 @@ def main():
                 assert member.isdir() or member.isfile()
                 assert member.uid == member.gid == 0 and member.mode in (0o644, 0o755)
             for p, v in files.items():
-                member = stream.getmember('pureeos-cdt-candidate/'+p)
+                member = stream.getmember(package_directory+'/'+p)
                 assert member.isfile() and hashlib.file_digest(stream.extractfile(member), 'sha256').hexdigest() == v['sha256']
             installation = args.output/'installed'; installation.mkdir()
             stream.extractall(installation, filter='data')
-        installed = installation/'pureeos-cdt-candidate'
+        installed = installation/package_directory
         assert all(sha(installed/p) == v['sha256'] for p, v in files.items())
+        assert all(sha(installed/p) == d for p, d in report['native_tools_sha256'].items())
         run('installed-compiler-version', [installed/'bin/cdt-cpp', '--version'])
         project_parent = args.output/'project with spaces'; project_parent.mkdir()
         run('installed-init-generate', [installed/'bin/cdt-init', '--project=smoketest', '--path='+str(project_parent)])
