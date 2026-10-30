@@ -8,5 +8,19 @@
   "relocated_system_WASM": "5f25a25816fc6db145dbd811d9c24dd99c9b9b1fd260b8e16a045476d0c3c11a",
   "relocated_system_ABI": "6809814cb91cdfb55e9cf9bfb926343b9a8be02f82b8996796e11173eec40a9c",
   "rebuild_user_space": "Ubuntu26.10",
-  "runtime_portability_beyond_qualified_user_space_not_claimed": true
+  "runtime_portability_beyond_qualified_user_space_not_claimed": true,
+  "qualified_user_spaces": [
+    "Ubuntu24.04.5 LTS",
+    "Ubuntu26.04.1 LTS",
+    "Ubuntu26.10"
+  ],
+  "compatibility_qualification": {
+    "date": "2026-10-31",
+    "scope": "SDK execution, 32-case corpus x3, 76 native SDK jobs and actual system compilation on each recorded OS; no complete LLVM backend rebuild",
+    "report": "https://github.com/MatrixCoreX/PureEOS/blob/main/docs/ubuntu/COMPATIBILITY_20261030.md",
+    "temporary26_04_VM_deleted": true
+  },
+  "current_matching_system_WASM": "6ed4cccc3aac05231f95e63b5464325315668bea2997ddb15de0b29768bf3a62",
+  "current_matching_system_source": "d126cae28057edfcd0e2eb84654afd8efd6da257",
+  "current_matching_system_report": "https://github.com/MatrixCoreX/PureEOS/blob/main/docs/rewards/EXACT_1PCT_20261031.md"
 }

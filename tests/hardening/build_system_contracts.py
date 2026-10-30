@@ -56,6 +56,7 @@ def main():
         run('configure', ['cmake', '-S', source, '-B', build, '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
             '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_TOOLCHAIN_FILE=' + str(root / 'tests/hardening/isolated_toolchain.cmake'),
             '-DPUREEOS_CDT_ROOT=' + str(sdk), '-DCDT_ROOT=' + str(sdk), '-Dcdt_DIR=' + str(sdk / 'lib/cmake/cdt'),
+            '-DPUREEOS_BP_PEERING=ON', '-DPUREEOS_BP_MAINTENANCE=ON',
             '-DPUREEOS_UPGRADE_GOVERNANCE=ON', '-DPUREEOS_SINGLE_CHOICE_VOTING=ON',
             '-DPUREEOS_RESOURCE_SPLIT=ON', '-DPUREEOS_SEQUENTIAL_ROTATION=ON', '-DSYSTEM_ENABLE_CDT_VERSION_CHECK=ON'], 120)
         run('build-all-contracts', ['cmake', '--build', build, '--parallel', '2'], 1800)
