@@ -1,0 +1,12 @@
+{
+  "product": "PureEOS CDT",
+  "version": "1.0.0",
+  "release_identifier": "baseline-2026.10.30",
+  "qualified_compiler_source": "d5816c442dd03db13413645f99c61a01c82fdda6",
+  "existing_binaries_unchanged": true,
+  "legacy_embedded_identity_preserved": true,
+  "relocated_system_WASM": "5f25a25816fc6db145dbd811d9c24dd99c9b9b1fd260b8e16a045476d0c3c11a",
+  "relocated_system_ABI": "6809814cb91cdfb55e9cf9bfb926343b9a8be02f82b8996796e11173eec40a9c",
+  "rebuild_user_space": "Ubuntu26.10",
+  "runtime_portability_beyond_qualified_user_space_not_claimed": true
+}

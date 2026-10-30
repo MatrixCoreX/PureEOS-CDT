@@ -1,5 +1,14 @@
 # PureEOS CDT
 
+## baseline-2026.10.30 / 日期基线
+
+本次以 **PureEOS CDT 1.0.0** 名称重新分发已验证的编译器，SDK 目录为 `pureeos-cdt-1.0.0`，发行标识为 `baseline-2026.10.30`。编译器字节及其已验证源码 `d5816c442dd03db13413645f99c61a01c82fdda6` 保持不变；内部版本及部分 CMake 名称仍保留历史 AIC CDT 标识。更名目录后的系统合约重编译产生了相同的 WASM `5f25a25816fc6db145dbd811d9c24dd99c9b9b1fd260b8e16a045476d0c3c11a` 和 ABI `6809814cb91cdfb55e9cf9bfb926343b9a8be02f82b8996796e11173eec40a9c`。
+
+SDK/合约构建验证使用 Ubuntu 26.10 用户空间；PureEOS 节点在 Ubuntu 24.04 宿主搭配匹配运行环境的验证，不等于 CDT 在未准备环境的 Ubuntu 24.04 上原生构建通过。下方 `v1.0.0` 资产及 `aic-cdt-1.0.0` 目录说明属于历史发行，保持原样。
+
+This dated release redistributes the qualified compiler as **PureEOS CDT 1.0.0**, under `pureeos-cdt-1.0.0`, with release identifier `baseline-2026.10.30`. Compiler bytes and qualified code source `d5816c442dd03db13413645f99c61a01c82fdda6` are unchanged. Embedded versions and some CMake names retain the historical AIC CDT identity. Rebuilding the current system contract from the renamed SDK produced the same WASM/ABI hashes shown above. Build validation used Ubuntu 26.10 user space; node validation on Ubuntu 24.04 hosts with a matching runtime is not a native CDT-on-Ubuntu-24.04 build claim. The `v1.0.0` artifacts and old directory references below describe the preserved historical release.
+
+
 [简体中文](#简体中文) · [English](#english)
 
 ## 简体中文
