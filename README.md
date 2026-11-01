@@ -8,11 +8,11 @@
 
 ### 安装和使用
 
-从 [PureEOS CDT 最新发行](https://github.com/MatrixCoreX/PureEOS-CDT/releases/latest)或 [PureEOS 联合发行](https://github.com/MatrixCoreX/PureEOS/releases/latest)下载 SDK、源码和 SHA256SUMS。核验下载后解压：
+从 [PureEOS CDT 最新发行](https://github.com/MatrixCoreX/PureEOS-CDT/releases/tag/pureeos-v1.0.0)或 [PureEOS 联合发行](https://github.com/MatrixCoreX/PureEOS/releases/latest)下载 SDK、源码和 SHA256SUMS。核验下载后解压：
 
 ```bash
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf pureeos-cdt-1.0.0-baseline-2026.10.30-ubuntu26.10-x86_64.tar.gz
+tar -xzf pureeos-cdt-1.0.0-linux-x86_64.tar.gz
 export PATH="$PWD/pureeos-cdt-1.0.0/bin:$PATH"
 export CMAKE_PREFIX_PATH="$PWD/pureeos-cdt-1.0.0${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
 cdt-cpp --version
@@ -22,6 +22,8 @@ cmake --build hello-build --parallel 2
 ```
 
 SDK 根目录为 `pureeos-cdt-1.0.0`。项目生成器创建新目录并拒绝覆盖已有项目。当前工具版本输出和部分 CMake 标识为 `AIC CDT 1.0.0` / `cdt`；对外产品名称为 PureEOS CDT。以发行清单、版本及摘要识别工具链。
+
+配套PureEOS1.0.0使用CPU16、NET4MiB、状态库16GiB，包含7天升级审查和永久黑名单不占位/递补。[完整基线](https://github.com/MatrixCoreX/PureEOS/blob/v1.0.0/docs/BASELINE.md)。
 
 ### Ubuntu 支持和配套节点
 
@@ -78,7 +80,7 @@ python3 tests/hardening/run_sdk_native_units.py --sdk /path/to/pureeos-cdt-1.0.0
 
 ### Install and use
 
-Download the SDK, source and SHA256SUMS from the [latest PureEOS CDT release](https://github.com/MatrixCoreX/PureEOS-CDT/releases/latest) or the [joint PureEOS release](https://github.com/MatrixCoreX/PureEOS/releases/latest). Verify downloads, extract the SDK and use the commands above to configure PATH, CMAKE_PREFIX_PATH and a generated project.
+Download the SDK, source and SHA256SUMS from the [latest PureEOS CDT release](https://github.com/MatrixCoreX/PureEOS-CDT/releases/tag/pureeos-v1.0.0) or the [joint PureEOS release](https://github.com/MatrixCoreX/PureEOS/releases/latest). Verify downloads, extract the SDK and use the commands above to configure PATH, CMAKE_PREFIX_PATH and a generated project.
 
 The SDK directory is `pureeos-cdt-1.0.0`. The generator creates a new project and refuses to overwrite an existing destination. Current tool version output and some CMake identifiers are `AIC CDT 1.0.0` / `cdt`; the product name is PureEOS CDT. Identify the toolchain using its release manifest, version and hashes.
 
